@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-netflix-black: #141414;
+  --color-netflix-red: #e50914;
+}
+
+* { box-sizing: border-box; }
+html { background: #141414; }
+body { margin: 0; min-width: 320px; font-family: Arial, Helvetica, sans-serif; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+.field { width: 100%; border: 1px solid #444; border-radius: 0.375rem; background: #181818; padding: 0.75rem; color: white; outline: none; }
+.field:focus { border-color: #e50914; }
+.primary-button { border-radius: 0.375rem; background: #e50914; padding: 0.75rem 1rem; font-weight: 700; color: white; }
+.primary-button:hover { background: #b20710; }
+.primary-button:disabled { cursor: wait; opacity: 0.5; }
