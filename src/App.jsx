@@ -91,7 +91,28 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
   const previous = chapters[index - 1]
   const next = chapters[index + 1]
   const [width, setWidth] = useState('wide')
-  return <section className="-mx-5 -mt-8 bg-black md:-mx-10"><div className="sticky top-[65px] z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-[#181818]/95 px-4 py-3 backdrop-blur"><button onClick={back} className="flex items-center gap-2 text-sm text-gray-300 hover:text-white"><ArrowLeft className="h-4 w-4" />Back</button><span className="truncate text-sm font-bold">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="rounded bg-[#303030] px-2 py-1 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl justify-between gap-4 p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="rounded bg-[#232323] px-4 py-3 text-sm disabled:opacity-30"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="rounded bg-[#E50914] px-4 py-3 text-sm disabled:opacity-30">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
+  const [currentPage, setCurrentPage] = useState(1)
+
+  useEffect(() => {
+    setCurrentPage(1)
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+      if (visible) setCurrentPage(Number(visible.target.dataset.page))
+    }, { rootMargin: '-20% 0px -60% 0px' })
+
+    document.querySelectorAll('[data-reader-page]').forEach((page) => observer.observe(page))
+    return () => observer.disconnect()
+  }, [chapter.id, chapter.page_count])
+
+  function jumpToPage(event) {
+    const page = Number(event.target.value)
+    setCurrentPage(page)
+    document.getElementById(`reader-page-${chapter.id}-${page}`)?.scrollIntoView({ behavior: 'auto', block: 'start' })
+  }
+
+  return <section className="-mx-5 -mt-8 bg-black md:-mx-10"><div className="sticky top-[65px] z-10 border-b border-white/10 bg-[#181818]/95 px-4 py-3 backdrop-blur"><div className="flex items-center justify-between gap-3"><button onClick={back} className="flex items-center gap-2 text-sm text-gray-300 hover:text-white"><ArrowLeft className="h-4 w-4" />Back</button><span className="truncate text-sm font-bold">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="rounded bg-[#303030] px-2 py-1 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div><label className="mt-3 flex items-center gap-3 text-xs text-gray-400">Page {currentPage} / {chapter.page_count}<input type="range" min="1" max={chapter.page_count} value={currentPage} onInput={jumpToPage} onChange={jumpToPage} aria-label="Page position" className="w-full accent-[#E50914]" /></label></div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl justify-between gap-4 p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="rounded bg-[#232323] px-4 py-3 text-sm disabled:opacity-30"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="rounded bg-[#E50914] px-4 py-3 text-sm disabled:opacity-30">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
 }
 
 function AdminView({ series, refreshSeries, back, setMessage }) {
