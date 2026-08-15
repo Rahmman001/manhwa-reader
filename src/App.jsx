@@ -53,18 +53,29 @@ function App() {
     try { setSelectedSeries(item); setChapters(await fetchChapters(item.id)); setView('series') } catch (error) { setMessage(error.message) } finally { setLoading(false) }
   }
 
+  async function enterReader(chapter) {
+    setSelectedChapter(chapter)
+    setView('reader')
+    try { await document.documentElement.requestFullscreen?.() } catch { /* Fullscreen is optional. */ }
+  }
+
+  async function leaveReader() {
+    try { if (document.fullscreenElement) await document.exitFullscreen() } catch { /* Exiting fullscreen is optional. */ }
+    setView('series')
+  }
+
   const filteredSeries = useMemo(() => series.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [series, search])
 
   return (
     <div className="min-h-screen bg-[#141414] text-white">
-      <Header view={view} setView={setView} search={search} setSearch={setSearch} />
-      <main className="mx-auto max-w-7xl px-5 pb-12 pt-8 md:px-10">
+      {view !== 'reader' && <Header view={view} setView={setView} search={search} setSearch={setSearch} />}
+      <main className={view === 'reader' ? 'p-0' : 'mx-auto max-w-7xl px-5 pb-12 pt-8 md:px-10'}>
         {message && <div className="mb-5 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200">{message}</div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
         {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={() => setView('admin')} />}
-        {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={(chapter) => { setSelectedChapter(chapter); setView('reader') }} />}
-        {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={() => setView('series')} openReader={ (chapter) => setSelectedChapter(chapter) } />}
+        {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} />}
+        {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} />}
         {!loading && view === 'admin' && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
       </main>
     </div>
@@ -112,7 +123,7 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
     document.getElementById(`reader-page-${chapter.id}-${page}`)?.scrollIntoView({ behavior: 'auto', block: 'start' })
   }
 
-  return <section className="-mx-5 -mt-8 bg-black md:-mx-10"><div className="sticky top-[65px] z-10 border-b border-white/10 bg-[#181818]/95 px-4 py-3 backdrop-blur"><div className="flex items-center justify-between gap-3"><button onClick={back} className="flex items-center gap-2 text-sm text-gray-300 hover:text-white"><ArrowLeft className="h-4 w-4" />Back</button><span className="truncate text-sm font-bold">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="rounded bg-[#303030] px-2 py-1 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div><label className="mt-3 flex items-center gap-3 text-xs text-gray-400">Page {currentPage} / {chapter.page_count}<input type="range" min="1" max={chapter.page_count} value={currentPage} onInput={jumpToPage} onChange={jumpToPage} aria-label="Page position" className="w-full accent-[#E50914]" /></label></div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl justify-between gap-4 p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="rounded bg-[#232323] px-4 py-3 text-sm disabled:opacity-30"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="rounded bg-[#E50914] px-4 py-3 text-sm disabled:opacity-30">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
+  return <section className="min-h-screen bg-black"><div className="sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-4 py-3 backdrop-blur"><div className="flex items-center justify-between gap-3"><button onClick={back} className="flex items-center gap-2 text-sm text-gray-300 hover:text-white"><ArrowLeft className="h-4 w-4" />Exit reader</button><span className="truncate text-sm font-bold">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="rounded bg-[#303030] px-2 py-1 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div><label className="mt-3 flex items-center gap-3 text-xs text-gray-400">Page {currentPage} / {chapter.page_count}<input type="range" min="1" max={chapter.page_count} value={currentPage} onInput={jumpToPage} onChange={jumpToPage} aria-label="Page position" className="w-full accent-[#E50914]" /></label></div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl justify-between gap-4 p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="rounded bg-[#232323] px-4 py-3 text-sm disabled:opacity-30"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="rounded bg-[#E50914] px-4 py-3 text-sm disabled:opacity-30">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
 }
 
 function AdminView({ series, refreshSeries, back, setMessage }) {
