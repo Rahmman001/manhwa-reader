@@ -39,6 +39,8 @@ function App() {
   const [selectedChapter, setSelectedChapter] = useState(null)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [session, setSession] = useState(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [message, setMessage] = useState('')
 
   async function refreshSeries() {
@@ -47,6 +49,32 @@ function App() {
   }
 
   useEffect(() => { refreshSeries() }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+    let active = true
+
+    async function loadAdminStatus(userId) {
+      const { data, error } = await supabase.from('admin_users').select('user_id').eq('user_id', userId).maybeSingle()
+      if (!active) return
+      if (error) { setIsAdmin(false); setMessage(error.message); return }
+      setIsAdmin(Boolean(data))
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      setSession(data.session)
+      if (data.session?.user) loadAdminStatus(data.session.user.id)
+    })
+
+    const { data: auth } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setIsAdmin(false)
+      if (nextSession?.user) setTimeout(() => loadAdminStatus(nextSession.user.id), 0)
+    })
+
+    return () => { active = false; auth.subscription.unsubscribe() }
+  }, [])
 
   async function openSeries(item) {
     setLoading(true); setMessage('')
@@ -64,26 +92,58 @@ function App() {
     setView('series')
   }
 
+  function openAdmin() {
+    setView(isAdmin ? 'admin' : 'auth')
+  }
+
+  async function signOut() {
+    await supabase?.auth.signOut()
+    setView('home')
+  }
+
   const filteredSeries = useMemo(() => series.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [series, search])
 
   return (
     <div className="min-h-screen bg-[#141414] text-white">
-      {view !== 'reader' && <Header view={view} setView={setView} search={search} setSearch={setSearch} />}
+      {view !== 'reader' && <Header view={view} setView={setView} search={search} setSearch={setSearch} session={session} isAdmin={isAdmin} openAdmin={openAdmin} signOut={signOut} />}
       <main className={view === 'reader' ? 'p-0' : 'mx-auto max-w-7xl px-5 pb-12 pt-8 md:px-10'}>
         {message && <div className="mb-5 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200">{message}</div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
-        {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={() => setView('admin')} />}
+        {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} />}
         {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} />}
         {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} />}
-        {!loading && view === 'admin' && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
+        {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
+        {!loading && view === 'admin' && isAdmin && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
       </main>
     </div>
   )
 }
 
-function Header({ view, setView, search, setSearch }) {
-  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center gap-5 px-5 py-4 md:px-10"><button className="flex items-center gap-2 text-lg font-bold" onClick={() => setView('home')}><BookOpen className="text-[#E50914]" /> <span>MANHWA</span></button><nav className="hidden items-center gap-5 text-sm text-gray-400 md:flex"><button className={view === 'home' ? 'text-white' : ''} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={view === 'admin' ? 'text-white' : ''} onClick={() => setView('admin')}><UploadCloud className="mr-1 inline h-4 w-4" />Admin</button></nav><div className="ml-auto flex items-center gap-2 rounded-md border border-white/10 bg-[#232323] px-3 py-2"><Search className="h-4 w-4 text-gray-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" className="w-24 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-48" /></div></div></header>
+function Header({ view, setView, search, setSearch, session, isAdmin, openAdmin, signOut }) {
+  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center gap-5 px-5 py-4 md:px-10"><button className="flex items-center gap-2 text-lg font-bold" onClick={() => setView('home')}><BookOpen className="text-[#E50914]" /> <span>MANHWA</span></button><nav className="hidden items-center gap-5 text-sm text-gray-400 md:flex"><button className={view === 'home' ? 'text-white' : ''} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={view === 'admin' ? 'text-white' : ''} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button></nav><div className="ml-auto flex items-center gap-2"><div className="flex items-center gap-2 rounded-md border border-white/10 bg-[#232323] px-3 py-2"><Search className="h-4 w-4 text-gray-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" className="w-24 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-48" /></div>{session && <button onClick={signOut} className="text-xs text-gray-400 hover:text-white">Sign out</button>}</div></div></header>
+}
+
+function AuthView({ back, onAuthenticated }) {
+  const [mode, setMode] = useState('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(event) {
+    event.preventDefault(); setBusy(true); setMessage('')
+    try {
+      const result = mode === 'signin'
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password })
+      if (result.error) throw result.error
+      if (mode === 'signup' && !result.data.session) setMessage('Account created. Check your email, then sign in.')
+      else onAuthenticated()
+    } catch (error) { setMessage(error.message) } finally { setBusy(false) }
+  }
+
+  return <section className="mx-auto max-w-md"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="rounded-xl bg-[#232323] p-6"><h1 className="mb-2 text-3xl font-black">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1><p className="mb-6 text-sm text-gray-400">Only the account added as an admin can upload files.</p><form onSubmit={submit} className="space-y-4"><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete="email" className="field" /><input required minLength="6" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} className="field" /><button disabled={busy} className="primary-button w-full">{busy ? 'Please wait...' : mode === 'signin' ? 'Sign in' : 'Create account'}</button></form>{message && <p className="mt-4 text-sm text-gray-300">{message}</p>}<button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage('') }} className="mt-5 text-sm text-gray-400 hover:text-white">{mode === 'signin' ? 'Create a new account' : 'Already have an account? Sign in'}</button></div></section>
 }
 
 function HomeView({ series, openSeries, openAdmin }) {

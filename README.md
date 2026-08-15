@@ -52,6 +52,23 @@ Never put a Supabase service-role key in this frontend.
 
 The SQL intentionally allows public read/write because this is a personal MVP. It is not suitable for a public multi-user site. Before sharing the app publicly, replace these policies with authenticated admin-only writes.
 
+## Enable authentication and admin-only uploads
+
+1. Run `supabase/production-security.sql` in the Supabase SQL Editor.
+2. Open the app, choose **Sign in**, and create your account.
+3. Confirm your email if Supabase requires confirmation.
+4. In the Supabase SQL Editor, add your account as the only admin. Replace the email below:
+
+```sql
+insert into public.admin_users (user_id)
+select id from auth.users where email = 'your-email@example.com'
+on conflict (user_id) do nothing;
+```
+
+5. Sign out and sign in again. The Admin page will now be available to your account.
+
+The app keeps public reading enabled, but only accounts listed in `admin_users` can create, update, or delete series, chapters, and storage files. Do not add anyone else to this table.
+
 ## Commands
 
 ```bash
