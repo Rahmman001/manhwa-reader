@@ -245,9 +245,13 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
   const next = chapters[index + 1]
   const [width, setWidth] = useState('wide')
   const [currentPage, setCurrentPage] = useState(1)
+  const progressKey = `manhwa-reader-progress:${series.id}:${chapter.id}`
+  const restoredKey = useRef('')
 
   useEffect(() => {
-    setCurrentPage(1)
+    const savedPage = readReaderProgress(progressKey, chapter.page_count)
+    restoredKey.current = ''
+    setCurrentPage(savedPage)
     const observer = new IntersectionObserver((entries) => {
       const visible = entries
         .filter((entry) => entry.isIntersecting)
@@ -256,8 +260,17 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
     }, { rootMargin: '-20% 0px -60% 0px' })
 
     document.querySelectorAll('[data-reader-page]').forEach((page) => observer.observe(page))
-    return () => observer.disconnect()
-  }, [chapter.id, chapter.page_count])
+    const restoreTimer = setTimeout(() => {
+      document.getElementById(`reader-page-${chapter.id}-${savedPage}`)?.scrollIntoView({ behavior: 'auto', block: 'start' })
+      restoredKey.current = progressKey
+      saveReaderProgress(progressKey, savedPage)
+    }, 100)
+    return () => { observer.disconnect(); clearTimeout(restoreTimer) }
+  }, [chapter.id, chapter.page_count, progressKey])
+
+  useEffect(() => {
+    if (restoredKey.current === progressKey) saveReaderProgress(progressKey, currentPage)
+  }, [currentPage, progressKey])
 
   return <section className="min-h-screen bg-black"><div className="sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-4 py-3 backdrop-blur"><div className="flex items-center justify-between gap-3"><button onClick={back} className="flex items-center gap-2 text-sm text-gray-300 hover:text-white"><ArrowLeft className="h-4 w-4" />Exit reader</button><span className="truncate text-sm font-bold">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="rounded bg-[#303030] px-2 py-1 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div></div><div className="pointer-events-none fixed bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#181818]/90 px-2 py-1 text-[10px] text-gray-400 shadow backdrop-blur">{currentPage}/{chapter.page_count}</div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl justify-between gap-4 p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="rounded bg-[#232323] px-4 py-3 text-sm disabled:opacity-30"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="rounded bg-[#E50914] px-4 py-3 text-sm disabled:opacity-30">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
 }
@@ -328,6 +341,15 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
 }
 
 function EmptyState({ text }) { return <div className="rounded-lg border border-dashed border-white/15 p-8 text-center text-gray-500">{text}</div> }
+function readReaderProgress(key, pageCount) {
+  try {
+    const page = Number(localStorage.getItem(key))
+    return page >= 1 && page <= pageCount ? page : 1
+  } catch { return 1 }
+}
+function saveReaderProgress(key, page) {
+  try { localStorage.setItem(key, String(page)) } catch { /* Browser storage may be unavailable. */ }
+}
 function extractGenres(text) { return [...new Set((text.match(/#[\w-]+/g) || []).map((tag) => tag.slice(1)))] }
 function removeGenreTags(text) { return text.replace(/#[\w-]+/g, '').replace(/[ \t]{2,}/g, ' ').trim() }
 function chapterNumberFromName(name) {
