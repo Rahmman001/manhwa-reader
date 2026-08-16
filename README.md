@@ -69,17 +69,6 @@ on conflict (user_id) do nothing;
 
 The app keeps public reading enabled, but only accounts listed in `admin_users` can create, update, or delete series, chapters, and storage files. Do not add anyone else to this table.
 
-## Enable Google sign-in
-
-1. In Supabase, open **Authentication → Providers → Google** and enable Google.
-2. Create a Google OAuth **Web application** client in Google Cloud Console.
-3. Add your Vercel site URL and `http://localhost:5173` as authorized JavaScript origins.
-4. Copy the callback URL shown on the Supabase Google provider page into Google's authorized redirect URIs.
-5. Paste the Google Client ID and Client Secret into the Supabase Google provider settings.
-6. In **Authentication → URL Configuration**, add your Vercel URL and `http://localhost:5173` to the redirect URL allow list.
-
-The login screen now includes **Continue with Google**. Google users are still read-only unless their Supabase user ID is added to `admin_users`.
-
 ## Commands
 
 ```bash
