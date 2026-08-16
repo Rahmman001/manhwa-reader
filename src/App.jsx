@@ -11,6 +11,7 @@ import {
   Search,
   Trash2,
   UploadCloud,
+  X,
 } from 'lucide-react'
 import { processPdfAndUpload, chapterFolder } from './pdfProcessor'
 import { getPublicUrl, isSupabaseConfigured, supabase, STORAGE_BUCKET } from './supabase'
@@ -66,6 +67,12 @@ function App() {
   }
 
   useEffect(() => { refreshSeries() }, [])
+
+  useEffect(() => {
+    if (!message) return undefined
+    const timer = setTimeout(() => setMessage(''), 5000)
+    return () => clearTimeout(timer)
+  }, [message])
 
   useEffect(() => {
     if (!supabase) return
@@ -166,7 +173,7 @@ function App() {
     <div className="min-h-screen bg-[#141414] text-white">
       {view !== 'reader' && <Header view={view} setView={setView} search={search} setSearch={setSearch} session={session} isAdmin={isAdmin} openAdmin={openAdmin} signOut={signOut} />}
       <main className={view === 'reader' ? 'p-0' : 'mx-auto max-w-7xl px-5 pb-12 pt-8 md:px-10'}>
-        {message && <div className="mb-5 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200">{message}</div>}
+        {message && <div role="status" className="mb-5 flex items-center justify-between gap-4 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Close notification" className="rounded p-1 text-lg leading-none text-red-200 hover:bg-red-900 hover:text-white"><X className="h-4 w-4" /></button></div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
         {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} />}
