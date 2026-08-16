@@ -69,7 +69,7 @@ on conflict (user_id) do nothing;
 
 The app keeps public reading enabled, but only accounts listed in `admin_users` can create, update, or delete series, chapters, and storage files. Do not add anyone else to this table.
 
-The navbar shows the username instead of the email address. Existing accounts without a username show `Account` until they are updated.
+The navbar uses a user icon instead of showing the email address. Open it to change your username or sign out. Existing accounts can set a username there.
 
 When editing a series description, add genres as hashtags, for example `#Action #Fantasy #Adventure`. They appear as small rounded tags below the description.
 

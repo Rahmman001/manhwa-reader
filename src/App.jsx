@@ -11,6 +11,7 @@ import {
   Search,
   Trash2,
   UploadCloud,
+  UserRound,
   X,
 } from 'lucide-react'
 import { processPdfAndUpload, chapterFolder } from './pdfProcessor'
@@ -129,6 +130,15 @@ function App() {
     setView('home')
   }
 
+  async function updateUsername(value) {
+    if (!supabase || !session) throw new Error('Please sign in first.')
+    const nextUsername = value.trim()
+    if (nextUsername.length < 2 || nextUsername.length > 30) throw new Error('Username must be 2–30 characters.')
+    const { data, error } = await supabase.auth.updateUser({ data: { ...session.user.user_metadata, username: nextUsername } })
+    if (error) throw error
+    setSession((current) => current ? { ...current, user: data.user } : current)
+  }
+
   async function continueReading() {
     if (!lastRead) return
     const item = series.find((seriesItem) => seriesItem.id === lastRead.seriesId)
@@ -195,7 +205,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[#141414] text-white">
-      {view !== 'reader' && <Header view={view} seriesTitle={selectedSeries?.title} setView={setView} search={search} setSearch={setSearch} session={session} isAdmin={isAdmin} openAdmin={openAdmin} signOut={signOut} />}
+      {view !== 'reader' && <Header view={view} seriesTitle={selectedSeries?.title} setView={setView} search={search} setSearch={setSearch} session={session} isAdmin={isAdmin} openAdmin={openAdmin} signOut={signOut} updateUsername={updateUsername} />}
       <main className={view === 'reader' ? 'p-0' : 'mx-auto max-w-7xl px-5 pb-12 pt-8 md:px-10'}>
         {message && <div role="status" className="mb-5 flex items-center justify-between gap-4 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Close notification" className="rounded p-1 text-lg leading-none text-red-200 hover:bg-red-900 hover:text-white"><X className="h-4 w-4" /></button></div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
@@ -210,10 +220,26 @@ function App() {
   )
 }
 
-function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmin, openAdmin, signOut }) {
+function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmin, openAdmin, signOut, updateUsername }) {
   const navClass = (active) => `rounded-md px-3 py-2 text-sm transition ${active ? 'bg-[#3b0b0f] text-white' : 'text-gray-400 hover:bg-[#232323] hover:text-white'}`
-  const username = session?.user?.user_metadata?.username || 'Account'
-  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 md:gap-5 md:px-10 md:py-4"><button className="flex shrink-0 items-center gap-2 text-lg font-bold" onClick={() => setView('home')}><BookOpen className="text-[#E50914]" /> <span>MANHWA</span></button><nav className="hidden items-center gap-2 md:flex"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{view === 'series' && <span className="max-w-48 truncate px-2 text-sm text-gray-500">/ {seriesTitle}</span>}{view === 'admin' && <span className="px-2 text-sm text-gray-500">/ Admin</span>}</nav><div className="ml-auto flex min-w-0 items-center gap-2"><div className="flex min-w-0 items-center gap-2 rounded-md border border-white/10 bg-[#232323] px-3 py-2"><Search className="h-4 w-4 shrink-0 text-gray-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-28 min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 sm:w-44 md:w-56" /></div>{session && <span className="hidden max-w-40 truncate text-xs font-semibold text-gray-300 lg:inline">{username}</span>}{session && <button onClick={signOut} className="hidden text-xs text-gray-400 hover:text-white sm:inline">Sign out</button>}</div></div><div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3 md:hidden"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{session && <><span className="rounded-md px-3 py-2 text-sm font-semibold text-gray-300">{username}</span><button onClick={signOut} className="rounded-md px-3 py-2 text-sm text-gray-400 hover:bg-[#232323] hover:text-white">Sign out</button></>}</div></header>
+  const username = session?.user?.user_metadata?.username || ''
+  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 md:gap-5 md:px-10 md:py-4"><button className="flex shrink-0 items-center gap-2 text-lg font-bold" onClick={() => setView('home')}><BookOpen className="text-[#E50914]" /> <span>MANHWA</span></button><nav className="hidden items-center gap-2 md:flex"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{view === 'series' && <span className="max-w-48 truncate px-2 text-sm text-gray-500">/ {seriesTitle}</span>}{view === 'admin' && <span className="px-2 text-sm text-gray-500">/ Admin</span>}</nav><div className="ml-auto flex min-w-0 items-center gap-2"><div className="flex min-w-0 items-center gap-2 rounded-md border border-white/10 bg-[#232323] px-3 py-2"><Search className="h-4 w-4 shrink-0 text-gray-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-28 min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 sm:w-44 md:w-56" /></div>{session && <UserMenu username={username} updateUsername={updateUsername} signOut={signOut} />}</div></div><div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3 md:hidden"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{session && <UserMenu username={username} updateUsername={updateUsername} signOut={signOut} />}</div></header>
+}
+
+function UserMenu({ username, updateUsername, signOut }) {
+  const [open, setOpen] = useState(false)
+  const [value, setValue] = useState(username)
+  const [message, setMessage] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { setValue(username) }, [username])
+
+  async function saveUsername(event) {
+    event.preventDefault(); setBusy(true); setMessage('')
+    try { await updateUsername(value); setMessage('Username updated.') } catch (error) { setMessage(error.message) } finally { setBusy(false) }
+  }
+
+  return <div className="relative"><button aria-label="Open user settings" aria-expanded={open} onClick={() => setOpen(!open)} className={`rounded-md p-2 transition ${open ? 'bg-[#3b0b0f] text-white' : 'text-gray-400 hover:bg-[#232323] hover:text-white'}`}><UserRound className="h-5 w-5" /></button>{open && <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-white/10 bg-[#232323] p-4 shadow-xl"><div className="mb-4"><p className="text-sm font-bold">User settings</p><p className="mt-1 text-xs text-gray-500">Update your display name.</p></div><form onSubmit={saveUsername} className="space-y-3"><input required minLength={2} maxLength={30} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Username" className="field" /><button disabled={busy} className="primary-button w-full text-sm">{busy ? 'Saving...' : 'Save username'}</button></form>{message && <p className="mt-3 text-xs text-gray-400">{message}</p>}<button onClick={signOut} className="mt-4 w-full rounded bg-[#303030] px-3 py-2 text-sm text-gray-300 hover:bg-[#3a3a3a]">Sign out</button></div>}</div>
 }
 
 function AuthView({ back, onAuthenticated }) {
