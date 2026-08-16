@@ -247,6 +247,21 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
   const [currentPage, setCurrentPage] = useState(1)
   const progressKey = `manhwa-reader-progress:${series.id}:${chapter.id}`
   const restoredKey = useRef('')
+  const touchStart = useRef(null)
+
+  function handleTouchStart(event) {
+    touchStart.current = { x: event.changedTouches[0].clientX, y: event.changedTouches[0].clientY }
+  }
+
+  function handleTouchEnd(event) {
+    if (touchStart.current === null) return
+    const deltaX = event.changedTouches[0].clientX - touchStart.current.x
+    const deltaY = event.changedTouches[0].clientY - touchStart.current.y
+    touchStart.current = null
+    if (Math.abs(deltaX) < 70 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return
+    if (deltaX < 0 && next) openReader(next)
+    if (deltaX > 0 && previous) openReader(previous)
+  }
 
   useEffect(() => {
     const savedPage = readReaderProgress(progressKey, chapter.page_count)
@@ -272,7 +287,7 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
     if (restoredKey.current === progressKey) saveReaderProgress(progressKey, currentPage)
   }, [currentPage, progressKey])
 
-  return <section className="min-h-screen bg-black"><div className="sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-4 py-3 backdrop-blur"><div className="flex items-center justify-between gap-3"><button onClick={back} className="flex items-center gap-2 text-sm text-gray-300 hover:text-white"><ArrowLeft className="h-4 w-4" />Exit reader</button><span className="truncate text-sm font-bold">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="rounded bg-[#303030] px-2 py-1 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div></div><div className="pointer-events-none fixed bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#181818]/90 px-2 py-1 text-[10px] text-gray-400 shadow backdrop-blur">{currentPage}/{chapter.page_count}</div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl justify-between gap-4 p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="rounded bg-[#232323] px-4 py-3 text-sm disabled:opacity-30"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="rounded bg-[#E50914] px-4 py-3 text-sm disabled:opacity-30">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
+  return <section onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} className="min-h-screen bg-black"><div className="sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-2 py-2 backdrop-blur sm:px-4 sm:py-3"><div className="flex items-center justify-between gap-2"><button onClick={back} className="flex min-h-10 items-center gap-1 rounded px-2 text-sm text-gray-300 hover:bg-[#303030] hover:text-white sm:gap-2 sm:px-3"><ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Exit reader</span><span className="sm:hidden">Exit</span></button><span className="min-w-0 truncate text-xs font-bold sm:text-sm">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="min-h-10 rounded bg-[#303030] px-2 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div></div><div className="pointer-events-none fixed bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#181818]/90 px-2 py-1 text-[10px] text-gray-400 shadow backdrop-blur">{currentPage}/{chapter.page_count}</div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl gap-3 p-4 sm:justify-between sm:gap-4 sm:p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="min-h-12 flex-1 rounded bg-[#232323] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="min-h-12 flex-1 rounded bg-[#E50914] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
 }
 
 function AdminView({ series, refreshSeries, back, setMessage }) {
