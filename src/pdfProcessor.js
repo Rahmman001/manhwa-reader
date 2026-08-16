@@ -19,8 +19,17 @@ export async function processPdfAndUpload(file, { seriesId, chapterNumber, onPro
   if (!supabase) throw new Error('Supabase is not configured.')
   const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise
   const folder = chapterFolder(seriesId, chapterNumber)
+  const listed = await supabase.storage.from(STORAGE_BUCKET).list(folder, { limit: 1000 })
+  if (listed.error) throw listed.error
+  const uploadedPages = new Set((listed.data || [])
+    .filter((item) => item.name.endsWith('.webp'))
+    .map((item) => Number(item.name.replace('.webp', ''))))
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    if (uploadedPages.has(pageNumber)) {
+      onProgress(`Skipping uploaded page ${pageNumber} of ${pdf.numPages}...`)
+      continue
+    }
     const page = await pdf.getPage(pageNumber)
     const viewport = page.getViewport({ scale: 2 })
     const canvas = document.createElement('canvas')

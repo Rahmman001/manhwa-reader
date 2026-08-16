@@ -82,7 +82,7 @@ The Horizon/
   Chapter 3.pdf
 ```
 
-The app sorts the files numerically, converts them, uploads them one at a time, and saves the chapter records. If a chapter already exists, uploading it again replaces its page images and updates its page count.
+The app sorts the files numerically, converts them, uploads them one at a time, and saves the chapter records. If an upload stops, retrying skips page images that were already uploaded and keeps failed chapters selected for another attempt.
 
 ## Commands
 
