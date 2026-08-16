@@ -63,6 +63,9 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [message, setMessage] = useState('')
   const [lastRead, setLastRead] = useState(readLastRead)
+  const [readerWidth, setReaderWidth] = useState(readReaderWidth)
+  const [favorites, setFavorites] = useState(readFavorites(null))
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
 
   async function refreshSeries() {
     setLoading(true)
@@ -103,6 +106,11 @@ function App() {
     return () => { active = false; auth.subscription.unsubscribe() }
   }, [])
 
+  useEffect(() => {
+    setFavorites(readFavorites(session?.user?.id))
+    setFavoritesOnly(false)
+  }, [session?.user?.id])
+
   async function openSeries(item) {
     setLoading(true); setMessage('')
     try { setSelectedSeries(item); setChapters(await fetchChapters(item.id)); setView('series') } catch (error) { setMessage(error.message) } finally { setLoading(false) }
@@ -137,6 +145,44 @@ function App() {
     const { data, error } = await supabase.auth.updateUser({ data: { ...session.user.user_metadata, username: nextUsername } })
     if (error) throw error
     setSession((current) => current ? { ...current, user: data.user } : current)
+  }
+
+  async function changePassword(value) {
+    if (!supabase || !session) throw new Error('Please sign in first.')
+    if (value.length < 6) throw new Error('Password must be at least 6 characters.')
+    const { error } = await supabase.auth.updateUser({ password: value })
+    if (error) throw error
+  }
+
+  function updateReaderWidth(value) {
+    if (!['wide', 'fixed', 'full'].includes(value)) return
+    saveReaderWidth(value); setReaderWidth(value)
+  }
+
+  function toggleFavorite(item) {
+    const key = favoritesKey(session?.user?.id)
+    setFavorites((current) => {
+      const next = current.includes(item.id) ? current.filter((id) => id !== item.id) : [...current, item.id]
+      saveFavorites(key, next)
+      return next
+    })
+  }
+
+  function clearFavorites() {
+    saveFavorites(favoritesKey(session?.user?.id), [])
+    setFavorites([]); setFavoritesOnly(false)
+  }
+
+  function clearReadingProgress() {
+    clearSavedProgress(); setLastRead(null)
+  }
+
+  async function deleteAccount() {
+    if (!supabase || !session || !window.confirm('Delete your account permanently? This cannot be undone.')) return
+    const { error } = await supabase.functions.invoke('delete-account')
+    if (error) throw error
+    await supabase.auth.signOut()
+    setSession(null); setIsAdmin(false); setView('home'); setMessage('Account deleted.')
   }
 
   async function continueReading() {
@@ -200,19 +246,19 @@ function App() {
     const query = search.trim().toLowerCase()
     const itemGenres = extractGenres(item.description || '')
     const searchableText = `${item.title} ${item.description || ''} ${itemGenres.join(' ')}`.toLowerCase()
-    return (!query || searchableText.includes(query)) && (!selectedGenre || itemGenres.includes(selectedGenre))
-  }), [series, search, selectedGenre])
+    return (!query || searchableText.includes(query)) && (!selectedGenre || itemGenres.includes(selectedGenre)) && (!favoritesOnly || favorites.includes(item.id))
+  }), [series, search, selectedGenre, favoritesOnly, favorites])
 
   return (
     <div className="min-h-screen bg-[#141414] text-white">
-      {view !== 'reader' && <Header view={view} seriesTitle={selectedSeries?.title} setView={setView} search={search} setSearch={setSearch} session={session} isAdmin={isAdmin} openAdmin={openAdmin} signOut={signOut} updateUsername={updateUsername} />}
+      {view !== 'reader' && <Header view={view} seriesTitle={selectedSeries?.title} setView={setView} search={search} setSearch={setSearch} session={session} isAdmin={isAdmin} openAdmin={openAdmin} signOut={signOut} updateUsername={updateUsername} changePassword={changePassword} readerWidth={readerWidth} updateReaderWidth={updateReaderWidth} clearReadingProgress={clearReadingProgress} clearFavorites={clearFavorites} favoritesCount={favorites.length} deleteAccount={deleteAccount} />}
       <main className={view === 'reader' ? 'p-0' : 'mx-auto max-w-7xl px-5 pb-12 pt-8 md:px-10'}>
         {message && <div role="status" className="mb-5 flex items-center justify-between gap-4 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Close notification" className="rounded p-1 text-lg leading-none text-red-200 hover:bg-red-900 hover:text-white"><X className="h-4 w-4" /></button></div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
-        {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} genres={genres} selectedGenre={selectedGenre} setSelectedGenre={setSelectedGenre} />}
+        {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} genres={genres} selectedGenre={selectedGenre} setSelectedGenre={setSelectedGenre} favoritesOnly={favoritesOnly} setFavoritesOnly={setFavoritesOnly} favoritesCount={favorites.length} favorites={favorites} toggleFavorite={toggleFavorite} />}
         {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} isAdmin={isAdmin} deleteSeries={deleteSeries} deleteChapter={deleteChapter} updateSeries={updateSeries} lastRead={lastRead} continueReading={continueReading} />}
-        {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} />}
+        {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} readerWidth={readerWidth} updateReaderWidth={updateReaderWidth} />}
         {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
         {!loading && view === 'admin' && isAdmin && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
       </main>
@@ -220,15 +266,17 @@ function App() {
   )
 }
 
-function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmin, openAdmin, signOut, updateUsername }) {
+function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmin, openAdmin, signOut, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount }) {
   const navClass = (active) => `rounded-md px-3 py-2 text-sm transition ${active ? 'bg-[#3b0b0f] text-white' : 'text-gray-400 hover:bg-[#232323] hover:text-white'}`
   const username = session?.user?.user_metadata?.username || ''
-  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 md:gap-5 md:px-10 md:py-4"><button className="flex shrink-0 items-center gap-2 text-lg font-bold" onClick={() => setView('home')}><BookOpen className="text-[#E50914]" /> <span>MANHWA</span></button><nav className="hidden items-center gap-2 md:flex"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{view === 'series' && <span className="max-w-48 truncate px-2 text-sm text-gray-500">/ {seriesTitle}</span>}{view === 'admin' && <span className="px-2 text-sm text-gray-500">/ Admin</span>}</nav><div className="ml-auto flex min-w-0 items-center gap-2"><div className="flex min-w-0 items-center gap-2 rounded-md border border-white/10 bg-[#232323] px-3 py-2"><Search className="h-4 w-4 shrink-0 text-gray-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-28 min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 sm:w-44 md:w-56" /></div>{session && <UserMenu username={username} updateUsername={updateUsername} signOut={signOut} />}</div></div><div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3 md:hidden"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{session && <UserMenu username={username} updateUsername={updateUsername} signOut={signOut} />}</div></header>
+  const menuProps = { username, email: session?.user?.email || '', updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }
+  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/95 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 md:gap-5 md:px-10 md:py-4"><button className="flex shrink-0 items-center gap-2 text-lg font-bold" onClick={() => setView('home')}><BookOpen className="text-[#E50914]" /> <span>MANHWA</span></button><nav className="hidden items-center gap-2 md:flex"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{view === 'series' && <span className="max-w-48 truncate px-2 text-sm text-gray-500">/ {seriesTitle}</span>}{view === 'admin' && <span className="px-2 text-sm text-gray-500">/ Admin</span>}</nav><div className="ml-auto flex min-w-0 items-center gap-2"><div className="flex min-w-0 items-center gap-2 rounded-md border border-white/10 bg-[#232323] px-3 py-2"><Search className="h-4 w-4 shrink-0 text-gray-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-28 min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 sm:w-44 md:w-56" /></div>{session && <UserMenu {...menuProps} />}</div></div><div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 pb-3 md:hidden"><button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="mr-1 inline h-4 w-4" />Browse</button><button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="mr-1 inline h-4 w-4" />Admin</> : 'Sign in'}</button>{session && <UserMenu {...menuProps} />}</div></header>
 }
 
-function UserMenu({ username, updateUsername, signOut }) {
+function UserMenu({ username, email, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(username)
+  const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -239,7 +287,20 @@ function UserMenu({ username, updateUsername, signOut }) {
     try { await updateUsername(value); setMessage('Username updated.') } catch (error) { setMessage(error.message) } finally { setBusy(false) }
   }
 
-  return <div className="relative"><button aria-label="Open user settings" aria-expanded={open} onClick={() => setOpen(!open)} className={`rounded-md p-2 transition ${open ? 'bg-[#3b0b0f] text-white' : 'text-gray-400 hover:bg-[#232323] hover:text-white'}`}><UserRound className="h-5 w-5" /></button>{open && <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-white/10 bg-[#232323] p-4 shadow-xl"><div className="mb-4"><p className="text-sm font-bold">User settings</p><p className="mt-1 text-xs text-gray-500">Update your display name.</p></div><form onSubmit={saveUsername} className="space-y-3"><input required minLength={2} maxLength={30} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Username" className="field" /><button disabled={busy} className="primary-button w-full text-sm">{busy ? 'Saving...' : 'Save username'}</button></form>{message && <p className="mt-3 text-xs text-gray-400">{message}</p>}<button onClick={signOut} className="mt-4 w-full rounded bg-[#303030] px-3 py-2 text-sm text-gray-300 hover:bg-[#3a3a3a]">Sign out</button></div>}</div>
+  async function savePassword(event) {
+    event.preventDefault(); setBusy(true); setMessage('')
+    try { await changePassword(password); setPassword(''); setMessage('Password updated.') } catch (error) { setMessage(error.message) } finally { setBusy(false) }
+  }
+
+  async function removeAccount() {
+    setBusy(true); setMessage('')
+    try { await deleteAccount() } catch (error) { setMessage(error.message || 'Account deletion is not available yet.') } finally { setBusy(false) }
+  }
+
+  function clearProgress() { clearReadingProgress(); setMessage('Reading progress cleared.') }
+  function clearSavedFavorites() { clearFavorites(); setMessage('Favorites cleared.') }
+
+  return <div className="relative"><button aria-label="Open user settings" aria-expanded={open} onClick={() => setOpen(!open)} className={`rounded-md p-2 transition ${open ? 'bg-[#3b0b0f] text-white' : 'text-gray-400 hover:bg-[#232323] hover:text-white'}`}><UserRound className="h-5 w-5" /></button>{open && <div className="fixed inset-0 z-40 overflow-y-auto bg-black/70 p-4" onClick={() => setOpen(false)}><div className="mx-auto mt-16 w-full max-w-md rounded-xl border border-white/10 bg-[#232323] p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="mb-5 flex items-start justify-between gap-4"><div><p className="text-lg font-bold">Profile settings</p><p className="mt-1 text-xs text-gray-500">{email}</p></div><button onClick={() => setOpen(false)} aria-label="Close profile settings" className="rounded p-1 text-gray-400 hover:bg-[#303030] hover:text-white"><X className="h-5 w-5" /></button></div><div className="space-y-5"><section><h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-[#E50914]">Profile</h3><form onSubmit={saveUsername} className="flex gap-2"><input required minLength={2} maxLength={30} value={value} onChange={(event) => setValue(event.target.value)} placeholder="Username" className="field" /><button disabled={busy} className="primary-button shrink-0 text-sm">Save</button></form></section><section><h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-[#E50914]">Security</h3><form onSubmit={savePassword} className="flex gap-2"><input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="New password" className="field" /><button disabled={busy} className="primary-button shrink-0 text-sm">Change</button></form></section><section><h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-[#E50914]">Reading</h3><label className="flex items-center justify-between gap-4 rounded bg-[#181818] p-3 text-sm"><span>Default image width</span><select value={readerWidth} onChange={(event) => updateReaderWidth(event.target.value)} className="rounded bg-[#303030] px-2 py-2 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></label><div className="mt-2 flex gap-2"><button onClick={clearProgress} className="flex-1 rounded bg-[#303030] px-3 py-2 text-xs text-gray-300 hover:bg-[#3a3a3a]">Clear progress</button><button onClick={clearSavedFavorites} className="flex-1 rounded bg-[#303030] px-3 py-2 text-xs text-gray-300 hover:bg-[#3a3a3a]">Clear favorites ({favoritesCount})</button></div></section><section className="border-t border-red-500/20 pt-4"><h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-red-400">Danger zone</h3><p className="mb-3 text-xs text-gray-500">Deleting your account permanently removes your login.</p><button disabled={busy} onClick={removeAccount} className="w-full rounded border border-red-500/30 px-3 py-2 text-sm text-red-300 hover:bg-red-950/50">Delete account</button></section></div>{message && <p className="mt-4 text-xs text-gray-400">{message}</p>}<button onClick={signOut} className="mt-5 w-full rounded bg-[#303030] px-3 py-2 text-sm text-gray-300 hover:bg-[#3a3a3a]">Sign out</button></div></div>}</div>
 }
 
 function AuthView({ back, onAuthenticated }) {
@@ -266,11 +327,11 @@ function AuthView({ back, onAuthenticated }) {
   return <section className="mx-auto max-w-md"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="rounded-xl bg-[#232323] p-6"><h1 className="mb-2 text-3xl font-black">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1><p className="mb-6 text-sm text-gray-400">Only the account added as an admin can upload files.</p><form onSubmit={submit} className="space-y-4">{mode === 'signup' && <input required minLength={2} maxLength={30} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" autoComplete="username" className="field" />}<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete="email" className="field" /><input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} className="field" /><button disabled={busy} className="primary-button w-full">{busy ? 'Please wait...' : mode === 'signin' ? 'Sign in' : 'Create account'}</button></form>{message && <p className="mt-4 text-sm text-gray-300">{message}</p>}<button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage('') }} className="mt-5 text-sm text-gray-400 hover:text-white">{mode === 'signin' ? 'Create a new account' : 'Already have an account? Sign in'}</button></div></section>
 }
 
-function HomeView({ series, openSeries, openAdmin, genres, selectedGenre, setSelectedGenre }) {
-  return <section><div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-4xl font-black md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-md bg-[#E50914] px-5 py-3 font-bold hover:bg-red-700">Upload a chapter</button></div></div><div className="mb-7 flex items-end justify-between gap-4 border-b border-white/10 pb-5"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">Library</p><h2 className="text-2xl font-bold tracking-tight">Your series</h2></div><span className="text-sm text-gray-500">{series.length} titles</span></div>{genres.length > 0 && <div className="mb-8"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Browse by genre</h3>{selectedGenre && <button onClick={() => setSelectedGenre('')} className="text-xs font-semibold text-[#E50914] hover:text-red-300">Clear</button>}</div><div className="genre-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"><button aria-pressed={selectedGenre === ''} onClick={() => setSelectedGenre('')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === '' ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>All</button>{genres.map((genre) => <button aria-pressed={selectedGenre === genre} key={genre} onClick={() => setSelectedGenre(selectedGenre === genre ? '' : genre)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === genre ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{genre}</button>)}</div></div>}{series.length === 0 ? <EmptyState text={selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} />)}</div>}</section>
+function HomeView({ series, openSeries, openAdmin, genres, selectedGenre, setSelectedGenre, favoritesOnly, setFavoritesOnly, favoritesCount, favorites, toggleFavorite }) {
+  return <section><div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-4xl font-black md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-md bg-[#E50914] px-5 py-3 font-bold hover:bg-red-700">Upload a chapter</button></div></div><div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">Library</p><h2 className="text-2xl font-bold tracking-tight">Your series</h2></div><div className="flex items-center gap-3"><span className="text-sm text-gray-500">{series.length} titles</span><button onClick={() => setFavoritesOnly(!favoritesOnly)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${favoritesOnly ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{favoritesOnly ? 'Favorites' : `Favorites ${favoritesCount}`}</button></div></div>{genres.length > 0 && <div className="mb-8"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Browse by genre</h3>{selectedGenre && <button onClick={() => setSelectedGenre('')} className="text-xs font-semibold text-[#E50914] hover:text-red-300">Clear</button>}</div><div className="genre-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"><button aria-pressed={selectedGenre === ''} onClick={() => setSelectedGenre('')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === '' ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>All</button>{genres.map((genre) => <button aria-pressed={selectedGenre === genre} key={genre} onClick={() => setSelectedGenre(selectedGenre === genre ? '' : genre)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === genre ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{genre}</button>)}</div></div>}{series.length === 0 ? <EmptyState text={favoritesOnly ? 'No favorites yet. Tap the star on a series to save it.' : selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} isFavorite={favorites.includes(item.id)} toggleFavorite={() => toggleFavorite(item)} />)}</div>}</section>
 }
 
-function SeriesCard({ series, onClick }) { return <button className="group overflow-hidden rounded-lg bg-[#232323] text-left transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button> }
+function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) { return <div className="group relative overflow-hidden rounded-lg bg-[#232323] transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]"><button className="block w-full text-left" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate pr-7 font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button><button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} onClick={toggleFavorite} className="absolute right-2 top-2 rounded-full bg-black/60 p-2 text-gray-300 backdrop-blur hover:text-yellow-300"><span className={isFavorite ? 'text-yellow-300' : ''}>★</span></button></div> }
 function Cover({ series, className = '' }) { return series.cover_image_url ? <img src={series.cover_image_url} alt="" className={`aspect-[2/3] w-full object-cover ${className}`} /> : <div className={`flex aspect-[2/3] items-end bg-gradient-to-br from-[#5c1118] via-[#292929] to-[#111] p-4 ${className}`}><span className="text-2xl font-black">{series.title.slice(0, 1).toUpperCase()}</span></div> }
 
 function SeriesView({ series, chapters, back, openReader, isAdmin, deleteSeries, deleteChapter, updateSeries, lastRead, continueReading }) {
@@ -294,11 +355,11 @@ function SeriesView({ series, chapters, back, openReader, isAdmin, deleteSeries,
   return <section><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="grid gap-8 md:grid-cols-[220px_1fr]"><Cover series={series} className="rounded-lg" /><div><div className="flex items-start justify-between gap-4"><div><p className="mb-2 text-sm font-bold uppercase tracking-widest text-[#E50914]">Series</p><h1 className="mb-4 text-4xl font-black">{series.title}</h1></div>{isAdmin && <div className="flex gap-2"><button onClick={startEditing} className="rounded bg-[#303030] px-3 py-2 text-xs text-gray-200 hover:bg-[#3a3a3a]"><Pencil className="mr-1 inline h-3 w-3" />Edit</button><button onClick={() => deleteSeries(series)} className="rounded bg-red-950/60 px-3 py-2 text-xs text-red-200 hover:bg-red-900"><Trash2 className="mr-1 inline h-3 w-3" />Delete</button></div>}</div>{editing ? <form onSubmit={saveChanges} className="mb-8 space-y-3 rounded-lg bg-[#232323] p-4"><input required value={title} onChange={(event) => setTitle(event.target.value)} className="field" placeholder="Title" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} className="field min-h-24" placeholder="Description (add tags like #Action #Fantasy)" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><div className="flex gap-2"><button className="primary-button">Save changes</button><button type="button" onClick={() => setEditing(false)} className="rounded bg-[#303030] px-4 py-3 text-sm">Cancel</button></div></form> : <div className="mb-8"><p className="max-w-2xl text-gray-400">{cleanDescription || 'No description yet.'}</p>{genres.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{genres.map((genre) => <span key={genre} className="rounded-full bg-[#3b0b0f] px-3 py-1 text-xs font-semibold text-red-200">{genre}</span>)}</div>}</div>}{hasSavedChapter && <div className="mb-8 flex flex-col gap-3 rounded-lg border border-white/10 bg-[#232323] p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs uppercase tracking-widest text-[#E50914]">Continue reading</p><p className="font-bold">Chapter {lastRead.chapterNumber}</p></div><button onClick={continueReading} className="w-full rounded bg-[#E50914] px-4 py-3 text-sm font-bold hover:bg-red-700 sm:w-auto">Continue</button></div>}<h2 className="mb-3 text-xl font-bold">Chapters</h2>{chapters.length === 0 ? <EmptyState text="No chapters uploaded yet." /> : <div className="space-y-2">{chapters.map((chapter) => <div key={chapter.id} className="flex items-center gap-2"><button onClick={() => openReader(chapter)} className="flex min-w-0 flex-1 items-center justify-between rounded-lg bg-[#232323] px-4 py-4 text-left hover:bg-[#303030]"><span>Chapter {chapter.chapter_number}</span><span className="text-sm text-gray-500">{chapter.page_count} pages <ChevronRight className="ml-2 inline h-4 w-4" /></span></button>{isAdmin && <button onClick={() => deleteChapter(chapter)} aria-label={`Delete chapter ${chapter.chapter_number}`} className="rounded bg-red-950/60 p-3 text-red-200 hover:bg-red-900"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}</div></div></section>
 }
 
-function ReaderView({ series, chapter, chapters, back, openReader }) {
+function ReaderView({ series, chapter, chapters, back, openReader, readerWidth, updateReaderWidth }) {
   const index = chapters.findIndex((item) => item.id === chapter.id)
   const previous = chapters[index - 1]
   const next = chapters[index + 1]
-  const [width, setWidth] = useState('wide')
+  const [width, setWidth] = useState(readerWidth)
   const [currentPage, setCurrentPage] = useState(1)
   const progressKey = `manhwa-reader-progress:${series.id}:${chapter.id}`
   const restoredKey = useRef('')
@@ -342,7 +403,9 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
     if (restoredKey.current === progressKey) saveReaderProgress(progressKey, currentPage)
   }, [currentPage, progressKey])
 
-  return <section onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} className="min-h-screen bg-black"><div className="sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-2 py-2 backdrop-blur sm:px-4 sm:py-3"><div className="flex items-center justify-between gap-2"><button onClick={back} className="flex min-h-10 items-center gap-1 rounded px-2 text-sm text-gray-300 hover:bg-[#303030] hover:text-white sm:gap-2 sm:px-3"><ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Exit reader</span><span className="sm:hidden">Exit</span></button><span className="min-w-0 truncate text-xs font-bold sm:text-sm">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => setWidth(event.target.value)} className="min-h-10 rounded bg-[#303030] px-2 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div></div><div className="pointer-events-none fixed bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#181818]/90 px-2 py-1 text-[10px] text-gray-400 shadow backdrop-blur">{currentPage}/{chapter.page_count}</div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl gap-3 p-4 sm:justify-between sm:gap-4 sm:p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="min-h-12 flex-1 rounded bg-[#232323] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="min-h-12 flex-1 rounded bg-[#E50914] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
+  useEffect(() => { setWidth(readerWidth) }, [readerWidth])
+
+  return <section onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} className="min-h-screen bg-black"><div className="sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-2 py-2 backdrop-blur sm:px-4 sm:py-3"><div className="flex items-center justify-between gap-2"><button onClick={back} className="flex min-h-10 items-center gap-1 rounded px-2 text-sm text-gray-300 hover:bg-[#303030] hover:text-white sm:gap-2 sm:px-3"><ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Exit reader</span><span className="sm:hidden">Exit</span></button><span className="min-w-0 truncate text-xs font-bold sm:text-sm">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => { setWidth(event.target.value); updateReaderWidth(event.target.value) }} className="min-h-10 rounded bg-[#303030] px-2 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div></div><div className="pointer-events-none fixed bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#181818]/90 px-2 py-1 text-[10px] text-gray-400 shadow backdrop-blur">{currentPage}/{chapter.page_count}</div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="block w-full" />)}</div><div className="mx-auto flex max-w-4xl gap-3 p-4 sm:justify-between sm:gap-4 sm:p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="min-h-12 flex-1 rounded bg-[#232323] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="min-h-12 flex-1 rounded bg-[#E50914] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
 }
 
 function AdminView({ series, refreshSeries, back, setMessage }) {
@@ -430,6 +493,25 @@ function readReaderProgress(key, pageCount) {
 }
 function saveReaderProgress(key, page) {
   try { localStorage.setItem(key, String(page)) } catch { /* Browser storage may be unavailable. */ }
+}
+function readReaderWidth() {
+  try { return ['wide', 'fixed', 'full'].includes(localStorage.getItem('manhwa-reader-width')) ? localStorage.getItem('manhwa-reader-width') : 'wide' } catch { return 'wide' }
+}
+function saveReaderWidth(width) {
+  try { localStorage.setItem('manhwa-reader-width', width) } catch { /* Browser storage may be unavailable. */ }
+}
+function clearSavedProgress() {
+  try {
+    Object.keys(localStorage).filter((key) => key.startsWith('manhwa-reader-progress:')).forEach((key) => localStorage.removeItem(key))
+    localStorage.removeItem('manhwa-last-read')
+  } catch { /* Browser storage may be unavailable. */ }
+}
+function favoritesKey(userId) { return `manhwa-favorites:${userId || 'guest'}` }
+function readFavorites(userId) {
+  try { return JSON.parse(localStorage.getItem(favoritesKey(userId))) || [] } catch { return [] }
+}
+function saveFavorites(key, favorites) {
+  try { localStorage.setItem(key, JSON.stringify(favorites)) } catch { /* Browser storage may be unavailable. */ }
 }
 function readLastRead() {
   try { return JSON.parse(localStorage.getItem('manhwa-last-read')) || null } catch { return null }

@@ -71,6 +71,14 @@ The app keeps public reading enabled, but only accounts listed in `admin_users` 
 
 The navbar uses a user icon instead of showing the email address. Open it to change your username or sign out. Existing accounts can set a username there.
 
+Profile settings also include password changes, reader width preference, clearing reading progress, favorites, account email, and account deletion. To enable the delete-account button, deploy the secure function once from the project folder:
+
+```bash
+supabase functions deploy delete-account
+```
+
+The function is in `supabase/functions/delete-account/index.ts`. The service-role key stays inside Supabase and is never placed in the browser app.
+
 When editing a series description, add genres as hashtags, for example `#Action #Fantasy #Adventure`. They appear as small rounded tags below the description.
 
 Each series page remembers the last opened chapter and shows a **Continue reading** button for that series. Reading progress is stored locally in the browser.
