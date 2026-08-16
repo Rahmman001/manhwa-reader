@@ -69,6 +69,8 @@ on conflict (user_id) do nothing;
 
 The app keeps public reading enabled, but only accounts listed in `admin_users` can create, update, or delete series, chapters, and storage files. Do not add anyone else to this table.
 
+When editing a series description, add genres as hashtags, for example `#Action #Fantasy #Adventure`. They appear as small rounded tags below the description.
+
 ## Bulk upload chapters
 
 Open **Admin** and choose **PDF files** to select one or more PDFs, or choose **folder** to select a complete folder. Name files with their chapter number, for example:
