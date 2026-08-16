@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   BookOpen,
@@ -224,12 +224,11 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
   const [description, setDescription] = useState('')
   const [cover, setCover] = useState(null)
   const [seriesId, setSeriesId] = useState('')
-  const [uploadMode, setUploadMode] = useState('bulk')
   const [chapterFiles, setChapterFiles] = useState([])
-  const [singlePdf, setSinglePdf] = useState(null)
-  const [chapterNumber, setChapterNumber] = useState('')
   const [progress, setProgress] = useState('')
   const [busy, setBusy] = useState(false)
+  const filesInput = useRef(null)
+  const folderInput = useRef(null)
 
   async function createSeries(event) {
     event.preventDefault()
@@ -263,22 +262,10 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
     if (error) throw error
   }
 
-  async function uploadSingleChapter(event) {
-    event.preventDefault()
-    if (!supabase) return setMessage('Configure Supabase before uploading a chapter.')
-    if (!seriesId || !singlePdf || chapterNumber === '') return setMessage('Choose a series, chapter number, and PDF first.')
-    setBusy(true); setMessage('')
-    const label = `Chapter ${chapterNumber}`
-    try {
-      await uploadChapterFile(singlePdf, Number(chapterNumber), label)
-      setSinglePdf(null); setProgress(`Uploaded ${label}.`)
-    } catch (error) { const detail = `Stopped at ${label}: ${error.message}`; setMessage(detail); setProgress(detail) } finally { setBusy(false) }
-  }
-
   async function uploadChapters(event) {
     event.preventDefault()
     if (!supabase) return setMessage('Configure Supabase before uploading chapters.')
-    if (!seriesId || !chapterFiles.length) return setMessage('Choose a series and a folder of PDF chapters first.')
+    if (!seriesId || !chapterFiles.length) return setMessage('Choose a series and one or more PDF files first.')
     if (chapterFiles.some((item) => item.chapterNumber === null)) return setMessage('Every PDF filename needs a chapter number, such as Chapter 1.pdf.')
     if (new Set(chapterFiles.map((item) => item.chapterNumber)).size !== chapterFiles.length) return setMessage('Two files have the same chapter number.')
 
@@ -294,7 +281,7 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
     } catch (error) { const detail = `Stopped at ${currentChapter}: ${error.message}`; setMessage(detail); setProgress(detail) } finally { setBusy(false) }
   }
 
-  return <section className="mx-auto max-w-3xl"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><h1 className="mb-8 text-4xl font-black">Admin</h1><div className="grid gap-6 md:grid-cols-2"><form onSubmit={createSeries} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">New series</h2><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" className="field" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="field min-h-28" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><Plus className="inline h-4 w-4" /> Create series</button></form><form onSubmit={uploadMode === 'single' ? uploadSingleChapter : uploadChapters} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">Upload chapters</h2><div className="flex gap-2"><button type="button" onClick={() => setUploadMode('single')} className={`flex-1 rounded px-3 py-2 text-sm ${uploadMode === 'single' ? 'bg-[#E50914]' : 'bg-[#303030] text-gray-400'}`}>Single PDF</button><button type="button" onClick={() => setUploadMode('bulk')} className={`flex-1 rounded px-3 py-2 text-sm ${uploadMode === 'bulk' ? 'bg-[#E50914]' : 'bg-[#303030] text-gray-400'}`}>Bulk folder</button></div><select required value={seriesId} onChange={(event) => setSeriesId(event.target.value)} className="field"><option value="">Choose series</option>{series.filter((item) => !item.id.startsWith('demo-')).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select>{uploadMode === 'single' ? <><input required type="number" min="0" step="0.1" value={chapterNumber} onChange={(event) => setChapterNumber(event.target.value)} className="field" placeholder="Chapter number" /><input required type="file" accept=".pdf,application/pdf" onChange={(event) => setSinglePdf(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><UploadCloud className="inline h-4 w-4" /> Upload chapter</button></> : <><input required type="file" accept=".pdf,application/pdf" multiple webkitdirectory="" directory="" onChange={selectChapterFiles} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><p className="text-xs text-gray-500">Choose the folder containing files named like Chapter 1.pdf, Chapter 2.pdf, and so on.</p>{chapterFiles.length > 0 && <div className="max-h-32 overflow-auto rounded bg-[#181818] p-3 text-xs text-gray-400">{chapterFiles.map((item) => <div key={`${item.file.name}-${item.file.lastModified}`}>{item.chapterNumber === null ? '?' : `Chapter ${item.chapterNumber}`} — {item.file.name}</div>)}</div>}<button disabled={busy} className="primary-button"><UploadCloud className="inline h-4 w-4" /> Upload {chapterFiles.length || ''} chapters</button></>}{progress && <p className="text-sm text-gray-400">{progress}</p>}</form></div></section>
+  return <section className="mx-auto max-w-3xl"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><h1 className="mb-8 text-4xl font-black">Admin</h1><div className="grid gap-6 md:grid-cols-2"><form onSubmit={createSeries} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">New series</h2><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" className="field" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="field min-h-28" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><Plus className="inline h-4 w-4" /> Create series</button></form><form onSubmit={uploadChapters} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">Upload chapters</h2><select required value={seriesId} onChange={(event) => setSeriesId(event.target.value)} className="field"><option value="">Choose series</option>{series.filter((item) => !item.id.startsWith('demo-')).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><div className="flex gap-2"><button type="button" onClick={() => filesInput.current?.click()} className="flex-1 rounded bg-[#303030] px-3 py-2 text-sm hover:bg-[#3a3a3a]">Choose PDF files</button><button type="button" onClick={() => folderInput.current?.click()} className="flex-1 rounded bg-[#303030] px-3 py-2 text-sm hover:bg-[#3a3a3a]">Choose folder</button></div><input ref={filesInput} type="file" accept=".pdf,application/pdf" multiple onChange={selectChapterFiles} className="hidden" /><input ref={folderInput} type="file" accept=".pdf,application/pdf" multiple webkitdirectory="" directory="" onChange={selectChapterFiles} className="hidden" /><p className="text-xs text-gray-500">Choose one PDF, multiple PDFs, or a folder. Filenames need a chapter number, such as Chapter 1.pdf.</p>{chapterFiles.length > 0 && <div className="max-h-32 overflow-auto rounded bg-[#181818] p-3 text-xs text-gray-400">{chapterFiles.map((item) => <div key={`${item.file.name}-${item.file.lastModified}`}>{item.chapterNumber === null ? '?' : `Chapter ${item.chapterNumber}`} — {item.file.name}</div>)}</div>}<button disabled={busy} className="primary-button"><UploadCloud className="inline h-4 w-4" /> Upload {chapterFiles.length || ''} chapters</button>{progress && <p className="text-sm text-gray-400">{progress}</p>}</form></div></section>
 }
 
 function EmptyState({ text }) { return <div className="rounded-lg border border-dashed border-white/15 p-8 text-center text-gray-500">{text}</div> }

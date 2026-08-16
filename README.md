@@ -71,7 +71,7 @@ The app keeps public reading enabled, but only accounts listed in `admin_users` 
 
 ## Bulk upload chapters
 
-Open **Admin** and choose **Single PDF** to upload one chapter with a manual chapter number, or choose **Bulk folder** to upload a complete folder. For bulk upload, name files with their chapter number, for example:
+Open **Admin** and choose **PDF files** to select one or more PDFs, or choose **folder** to select a complete folder. Name files with their chapter number, for example:
 
 ```text
 The Horizon/
