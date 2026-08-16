@@ -71,6 +71,8 @@ The app keeps public reading enabled, but only accounts listed in `admin_users` 
 
 When editing a series description, add genres as hashtags, for example `#Action #Fantasy #Adventure`. They appear as small rounded tags below the description.
 
+The Home page also remembers the last opened series and chapter and shows a **Continue reading** button. Reading progress is stored locally in the browser.
+
 ## Bulk upload chapters
 
 Open **Admin** and choose **PDF files** to select one or more PDFs, or choose **folder** to select a complete folder. Name files with their chapter number, for example:

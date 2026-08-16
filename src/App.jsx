@@ -60,6 +60,7 @@ function App() {
   const [session, setSession] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [message, setMessage] = useState('')
+  const [lastRead, setLastRead] = useState(readLastRead)
 
   async function refreshSeries() {
     setLoading(true)
@@ -108,6 +109,8 @@ function App() {
   async function enterReader(chapter) {
     setSelectedChapter(chapter)
     setView('reader')
+    const reading = { seriesId: selectedSeries?.id, seriesTitle: selectedSeries?.title, coverImageUrl: selectedSeries?.cover_image_url, chapterId: chapter.id, chapterNumber: chapter.chapter_number }
+    saveLastRead(reading); setLastRead(reading)
     try { await document.documentElement.requestFullscreen?.() } catch { /* Fullscreen is optional. */ }
   }
 
@@ -123,6 +126,20 @@ function App() {
   async function signOut() {
     await supabase?.auth.signOut()
     setView('home')
+  }
+
+  async function continueReading() {
+    if (!lastRead) return
+    const item = series.find((seriesItem) => seriesItem.id === lastRead.seriesId)
+    if (!item) return setLastRead(null)
+    setLoading(true); setMessage('')
+    try {
+      const loadedChapters = await fetchChapters(item.id)
+      const chapter = loadedChapters.find((chapterItem) => chapterItem.id === lastRead.chapterId) || loadedChapters.find((chapterItem) => Number(chapterItem.chapter_number) === Number(lastRead.chapterNumber))
+      if (!chapter) throw new Error('The saved chapter is no longer available.')
+      setSelectedSeries(item); setChapters(loadedChapters); setSelectedChapter(chapter); setView('reader')
+      try { await document.documentElement.requestFullscreen?.() } catch { /* Fullscreen is optional. */ }
+    } catch (error) { setMessage(error.message) } finally { setLoading(false) }
   }
 
   async function deleteSeries(item) {
@@ -176,7 +193,7 @@ function App() {
         {message && <div role="status" className="mb-5 flex items-center justify-between gap-4 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Close notification" className="rounded p-1 text-lg leading-none text-red-200 hover:bg-red-900 hover:text-white"><X className="h-4 w-4" /></button></div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
-        {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} />}
+        {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} lastRead={lastRead} continueReading={continueReading} />}
         {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} isAdmin={isAdmin} deleteSeries={deleteSeries} deleteChapter={deleteChapter} updateSeries={updateSeries} />}
         {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} />}
         {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
@@ -212,8 +229,8 @@ function AuthView({ back, onAuthenticated }) {
   return <section className="mx-auto max-w-md"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="rounded-xl bg-[#232323] p-6"><h1 className="mb-2 text-3xl font-black">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1><p className="mb-6 text-sm text-gray-400">Only the account added as an admin can upload files.</p><form onSubmit={submit} className="space-y-4"><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete="email" className="field" /><input required minLength="6" type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} className="field" /><button disabled={busy} className="primary-button w-full">{busy ? 'Please wait...' : mode === 'signin' ? 'Sign in' : 'Create account'}</button></form>{message && <p className="mt-4 text-sm text-gray-300">{message}</p>}<button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage('') }} className="mt-5 text-sm text-gray-400 hover:text-white">{mode === 'signin' ? 'Create a new account' : 'Already have an account? Sign in'}</button></div></section>
 }
 
-function HomeView({ series, openSeries, openAdmin }) {
-  return <section><div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-4xl font-black md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-md bg-[#E50914] px-5 py-3 font-bold hover:bg-red-700">Upload a chapter</button></div></div><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-bold">Your series</h2><span className="text-sm text-gray-500">{series.length} series</span></div>{series.length === 0 ? <EmptyState text="No series yet. Create one from Admin." /> : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} />)}</div>}</section>
+function HomeView({ series, openSeries, openAdmin, lastRead, continueReading }) {
+  return <section>{lastRead && <div className="mb-8 flex items-center gap-4 rounded-xl bg-[#232323] p-4"><Cover series={{ title: lastRead.seriesTitle, cover_image_url: lastRead.coverImageUrl }} className="h-20 w-14 rounded object-cover" /><div className="min-w-0 flex-1"><p className="text-xs uppercase tracking-widest text-[#E50914]">Continue reading</p><h2 className="truncate font-bold">{lastRead.seriesTitle}</h2><p className="text-sm text-gray-400">Chapter {lastRead.chapterNumber}</p></div><button onClick={continueReading} className="rounded bg-[#E50914] px-3 py-2 text-sm font-bold hover:bg-red-700">Continue</button></div>}<div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-4xl font-black md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-md bg-[#E50914] px-5 py-3 font-bold hover:bg-red-700">Upload a chapter</button></div></div><div className="mb-4 flex items-center justify-between"><h2 className="text-2xl font-bold">Your series</h2><span className="text-sm text-gray-500">{series.length} series</span></div>{series.length === 0 ? <EmptyState text="No series yet. Create one from Admin." /> : <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} />)}</div>}</section>
 }
 
 function SeriesCard({ series, onClick }) { return <button className="group overflow-hidden rounded-lg bg-[#232323] text-left transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button> }
@@ -375,6 +392,12 @@ function readReaderProgress(key, pageCount) {
 }
 function saveReaderProgress(key, page) {
   try { localStorage.setItem(key, String(page)) } catch { /* Browser storage may be unavailable. */ }
+}
+function readLastRead() {
+  try { return JSON.parse(localStorage.getItem('manhwa-last-read')) || null } catch { return null }
+}
+function saveLastRead(reading) {
+  try { localStorage.setItem('manhwa-last-read', JSON.stringify(reading)) } catch { /* Browser storage may be unavailable. */ }
 }
 function extractGenres(text) { return [...new Set((text.match(/#[\w-]+/g) || []).map((tag) => tag.slice(1)))] }
 function removeGenreTags(text) { return text.replace(/#[\w-]+/g, '').replace(/[ \t]{2,}/g, ' ').trim() }
