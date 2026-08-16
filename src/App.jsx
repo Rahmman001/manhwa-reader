@@ -181,13 +181,68 @@ function ReaderView({ series, chapter, chapters, back, openReader }) {
 }
 
 function AdminView({ series, refreshSeries, back, setMessage }) {
-  const [title, setTitle] = useState(''); const [description, setDescription] = useState(''); const [cover, setCover] = useState(null); const [seriesId, setSeriesId] = useState(''); const [chapterNumber, setChapterNumber] = useState('1'); const [pdf, setPdf] = useState(null); const [progress, setProgress] = useState(''); const [busy, setBusy] = useState(false)
-  async function createSeries(event) { event.preventDefault(); if (!supabase) return setMessage('Configure Supabase before creating a series.'); setBusy(true); try { const { data, error } = await supabase.from('series').insert({ title, description }).select().single(); if (error) throw error; if (cover) { const path = `series_${data.id}/cover.${cover.name.split('.').pop() || 'jpg'}`; const upload = await supabase.storage.from(STORAGE_BUCKET).upload(path, cover, { upsert: true, contentType: cover.type }); if (upload.error) throw upload.error; const update = await supabase.from('series').update({ cover_image_url: getPublicUrl(path) }).eq('id', data.id); if (update.error) throw update.error } setTitle(''); setDescription(''); setCover(null); setMessage('Series created.'); await refreshSeries() } catch (error) { setMessage(error.message) } finally { setBusy(false) } }
-  async function uploadChapter(event) { event.preventDefault(); if (!supabase) return setMessage('Configure Supabase before uploading a chapter.'); if (!seriesId || !pdf) return setMessage('Choose a series and a PDF first.'); setBusy(true); setProgress('Reading PDF...'); try { const result = await processPdfAndUpload(pdf, { seriesId, chapterNumber, onProgress: setProgress }); const { error } = await supabase.from('chapters').insert({ series_id: seriesId, chapter_number: Number(chapterNumber), page_count: result.pageCount }); if (error) throw error; setPdf(null); setProgress('Chapter uploaded.') } catch (error) { setMessage(error.message); setProgress('') } finally { setBusy(false) } }
-  return <section className="mx-auto max-w-3xl"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><h1 className="mb-8 text-4xl font-black">Admin</h1><div className="grid gap-6 md:grid-cols-2"><form onSubmit={createSeries} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">New series</h2><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" className="field" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="field min-h-28" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><Plus className="inline h-4 w-4" /> Create series</button></form><form onSubmit={uploadChapter} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">Upload chapter</h2><select required value={seriesId} onChange={(event) => setSeriesId(event.target.value)} className="field"><option value="">Choose series</option>{series.filter((item) => !item.id.startsWith('demo-')).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><input required type="number" min="0" step="0.1" value={chapterNumber} onChange={(event) => setChapterNumber(event.target.value)} className="field" placeholder="Chapter number" /><input required type="file" accept="application/pdf" onChange={(event) => setPdf(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><UploadCloud className="inline h-4 w-4" /> Upload PDF</button>{progress && <p className="text-sm text-gray-400">{progress}</p>}</form></div></section>
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [cover, setCover] = useState(null)
+  const [seriesId, setSeriesId] = useState('')
+  const [chapterFiles, setChapterFiles] = useState([])
+  const [progress, setProgress] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function createSeries(event) {
+    event.preventDefault()
+    if (!supabase) return setMessage('Configure Supabase before creating a series.')
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.from('series').insert({ title, description }).select().single()
+      if (error) throw error
+      if (cover) {
+        const path = `series_${data.id}/cover.${cover.name.split('.').pop() || 'jpg'}`
+        const upload = await supabase.storage.from(STORAGE_BUCKET).upload(path, cover, { upsert: true, contentType: cover.type })
+        if (upload.error) throw upload.error
+        const update = await supabase.from('series').update({ cover_image_url: getPublicUrl(path) }).eq('id', data.id)
+        if (update.error) throw update.error
+      }
+      setTitle(''); setDescription(''); setCover(null); setMessage('Series created.'); await refreshSeries()
+    } catch (error) { setMessage(error.message) } finally { setBusy(false) }
+  }
+
+  function selectChapterFiles(event) {
+    const files = Array.from(event.target.files || [])
+      .filter((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+      .map((file) => ({ file, chapterNumber: chapterNumberFromName(file.name) }))
+      .sort((a, b) => (a.chapterNumber ?? Infinity) - (b.chapterNumber ?? Infinity) || a.file.name.localeCompare(b.file.name))
+    setChapterFiles(files)
+  }
+
+  async function uploadChapters(event) {
+    event.preventDefault()
+    if (!supabase) return setMessage('Configure Supabase before uploading chapters.')
+    if (!seriesId || !chapterFiles.length) return setMessage('Choose a series and a folder of PDF chapters first.')
+    if (chapterFiles.some((item) => item.chapterNumber === null)) return setMessage('Every PDF filename needs a chapter number, such as Chapter 1.pdf.')
+    if (new Set(chapterFiles.map((item) => item.chapterNumber)).size !== chapterFiles.length) return setMessage('Two files have the same chapter number.')
+
+    setBusy(true); setMessage('')
+    try {
+      for (const [index, item] of chapterFiles.entries()) {
+        const label = `Chapter ${item.chapterNumber} (${index + 1}/${chapterFiles.length})`
+        const result = await processPdfAndUpload(item.file, { seriesId, chapterNumber: item.chapterNumber, onProgress: (text) => setProgress(`${label}: ${text}`) })
+        const { error } = await supabase.from('chapters').upsert({ series_id: seriesId, chapter_number: item.chapterNumber, page_count: result.pageCount }, { onConflict: 'series_id,chapter_number' })
+        if (error) throw error
+      }
+      setChapterFiles([]); setProgress(`Uploaded ${chapterFiles.length} chapters.`)
+    } catch (error) { setMessage(error.message); setProgress('') } finally { setBusy(false) }
+  }
+
+  return <section className="mx-auto max-w-3xl"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><h1 className="mb-8 text-4xl font-black">Admin</h1><div className="grid gap-6 md:grid-cols-2"><form onSubmit={createSeries} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">New series</h2><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" className="field" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="field min-h-28" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><Plus className="inline h-4 w-4" /> Create series</button></form><form onSubmit={uploadChapters} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">Bulk upload chapters</h2><select required value={seriesId} onChange={(event) => setSeriesId(event.target.value)} className="field"><option value="">Choose series</option>{series.filter((item) => !item.id.startsWith('demo-')).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><input required type="file" accept=".pdf,application/pdf" multiple webkitdirectory="" directory="" onChange={selectChapterFiles} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><p className="text-xs text-gray-500">Choose the folder containing files named like Chapter 1.pdf, Chapter 2.pdf, and so on.</p>{chapterFiles.length > 0 && <div className="max-h-32 overflow-auto rounded bg-[#181818] p-3 text-xs text-gray-400">{chapterFiles.map((item) => <div key={`${item.file.name}-${item.file.lastModified}`}>{item.chapterNumber === null ? '?' : `Chapter ${item.chapterNumber}`} — {item.file.name}</div>)}</div>}<button disabled={busy} className="primary-button"><UploadCloud className="inline h-4 w-4" /> Upload {chapterFiles.length || ''} chapters</button>{progress && <p className="text-sm text-gray-400">{progress}</p>}</form></div></section>
 }
 
 function EmptyState({ text }) { return <div className="rounded-lg border border-dashed border-white/15 p-8 text-center text-gray-500">{text}</div> }
+function chapterNumberFromName(name) {
+  const baseName = name.replace(/\.pdf$/i, '')
+  const match = baseName.match(/(?:chapter|ch|episode|ep)[^\d]*(\d+(?:\.\d+)?)/i) || baseName.match(/(?:^|[\s._-])(\d+(?:\.\d+)?)(?:$|[\s._-])/)
+  return match ? Number(match[1]) : null
+}
 function chapterPagePath(seriesId, chapterNumber, page) { return `${chapterFolder(seriesId, chapterNumber)}/${page}.webp` }
 
 export default App

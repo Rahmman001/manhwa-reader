@@ -69,6 +69,19 @@ on conflict (user_id) do nothing;
 
 The app keeps public reading enabled, but only accounts listed in `admin_users` can create, update, or delete series, chapters, and storage files. Do not add anyone else to this table.
 
+## Bulk upload chapters
+
+Open **Admin**, choose a series, and select the folder containing the PDF chapters. Name files with their chapter number, for example:
+
+```text
+The Horizon/
+  Chapter 1.pdf
+  Chapter 2.pdf
+  Chapter 3.pdf
+```
+
+The app sorts the files numerically, converts them, uploads them one at a time, and saves the chapter records. If a chapter already exists, uploading it again replaces its page images and updates its page count.
+
 ## Commands
 
 ```bash
