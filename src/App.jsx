@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   Plus,
   Search,
+  Trash2,
   UploadCloud,
 } from 'lucide-react'
 import { processPdfAndUpload, chapterFolder } from './pdfProcessor'
@@ -29,6 +30,21 @@ async function fetchChapters(seriesId) {
   const { data, error } = await supabase.from('chapters').select('*').eq('series_id', seriesId).order('chapter_number', { ascending: true })
   if (error) throw error
   return data || []
+}
+
+async function removeStorageFolder(prefix) {
+  if (!supabase) return
+  const { data, error } = await supabase.storage.from(STORAGE_BUCKET).list(prefix, { limit: 1000 })
+  if (error) throw error
+  for (const item of data || []) {
+    const path = `${prefix}/${item.name}`
+    if (item.id) {
+      const result = await supabase.storage.from(STORAGE_BUCKET).remove([path])
+      if (result.error) throw result.error
+    } else {
+      await removeStorageFolder(path)
+    }
+  }
 }
 
 function App() {
@@ -101,6 +117,29 @@ function App() {
     setView('home')
   }
 
+  async function deleteSeries(item) {
+    if (!supabase || !isAdmin || !window.confirm(`Delete ${item.title} and all its chapters?`)) return
+    setLoading(true); setMessage('')
+    try {
+      await removeStorageFolder(`series_${item.id}`)
+      const { error } = await supabase.from('series').delete().eq('id', item.id)
+      if (error) throw error
+      setSeries((current) => current.filter((seriesItem) => seriesItem.id !== item.id))
+      setSelectedSeries(null); setChapters([]); setView('home'); setMessage('Series deleted.')
+    } catch (error) { setMessage(error.message) } finally { setLoading(false) }
+  }
+
+  async function deleteChapter(chapter) {
+    if (!supabase || !isAdmin || !selectedSeries || !window.confirm(`Delete Chapter ${chapter.chapter_number}?`)) return
+    setLoading(true); setMessage('')
+    try {
+      await removeStorageFolder(chapterFolder(selectedSeries.id, chapter.chapter_number))
+      const { error } = await supabase.from('chapters').delete().eq('id', chapter.id)
+      if (error) throw error
+      setChapters((current) => current.filter((item) => item.id !== chapter.id)); setMessage('Chapter deleted.')
+    } catch (error) { setMessage(error.message) } finally { setLoading(false) }
+  }
+
   const filteredSeries = useMemo(() => series.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [series, search])
 
   return (
@@ -111,7 +150,7 @@ function App() {
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
         {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} />}
-        {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} />}
+        {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} isAdmin={isAdmin} deleteSeries={deleteSeries} deleteChapter={deleteChapter} />}
         {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} />}
         {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
         {!loading && view === 'admin' && isAdmin && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
@@ -153,8 +192,8 @@ function HomeView({ series, openSeries, openAdmin }) {
 function SeriesCard({ series, onClick }) { return <button className="group overflow-hidden rounded-lg bg-[#232323] text-left transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button> }
 function Cover({ series, className = '' }) { return series.cover_image_url ? <img src={series.cover_image_url} alt="" className={`aspect-[2/3] w-full object-cover ${className}`} /> : <div className={`flex aspect-[2/3] items-end bg-gradient-to-br from-[#5c1118] via-[#292929] to-[#111] p-4 ${className}`}><span className="text-2xl font-black">{series.title.slice(0, 1).toUpperCase()}</span></div> }
 
-function SeriesView({ series, chapters, back, openReader }) {
-  return <section><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="grid gap-8 md:grid-cols-[220px_1fr]"><Cover series={series} className="rounded-lg" /><div><p className="mb-2 text-sm font-bold uppercase tracking-widest text-[#E50914]">Series</p><h1 className="mb-4 text-4xl font-black">{series.title}</h1><p className="mb-8 max-w-2xl text-gray-400">{series.description || 'No description yet.'}</p><h2 className="mb-3 text-xl font-bold">Chapters</h2>{chapters.length === 0 ? <EmptyState text="No chapters uploaded yet." /> : <div className="space-y-2">{chapters.map((chapter) => <button key={chapter.id} onClick={() => openReader(chapter)} className="flex w-full items-center justify-between rounded-lg bg-[#232323] px-4 py-4 text-left hover:bg-[#303030]"><span>Chapter {chapter.chapter_number}</span><span className="text-sm text-gray-500">{chapter.page_count} pages <ChevronRight className="ml-2 inline h-4 w-4" /></span></button>)}</div>}</div></div></section>
+function SeriesView({ series, chapters, back, openReader, isAdmin, deleteSeries, deleteChapter }) {
+  return <section><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="grid gap-8 md:grid-cols-[220px_1fr]"><Cover series={series} className="rounded-lg" /><div><div className="flex items-start justify-between gap-4"><div><p className="mb-2 text-sm font-bold uppercase tracking-widest text-[#E50914]">Series</p><h1 className="mb-4 text-4xl font-black">{series.title}</h1></div>{isAdmin && <button onClick={() => deleteSeries(series)} className="rounded bg-red-950/60 px-3 py-2 text-xs text-red-200 hover:bg-red-900"><Trash2 className="mr-1 inline h-3 w-3" />Delete series</button>}</div><p className="mb-8 max-w-2xl text-gray-400">{series.description || 'No description yet.'}</p><h2 className="mb-3 text-xl font-bold">Chapters</h2>{chapters.length === 0 ? <EmptyState text="No chapters uploaded yet." /> : <div className="space-y-2">{chapters.map((chapter) => <div key={chapter.id} className="flex items-center gap-2"><button onClick={() => openReader(chapter)} className="flex min-w-0 flex-1 items-center justify-between rounded-lg bg-[#232323] px-4 py-4 text-left hover:bg-[#303030]"><span>Chapter {chapter.chapter_number}</span><span className="text-sm text-gray-500">{chapter.page_count} pages <ChevronRight className="ml-2 inline h-4 w-4" /></span></button>{isAdmin && <button onClick={() => deleteChapter(chapter)} aria-label={`Delete chapter ${chapter.chapter_number}`} className="rounded bg-red-950/60 p-3 text-red-200 hover:bg-red-900"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}</div></div></section>
 }
 
 function ReaderView({ series, chapter, chapters, back, openReader }) {
