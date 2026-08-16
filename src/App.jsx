@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Home,
   LoaderCircle,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -140,6 +141,25 @@ function App() {
     } catch (error) { setMessage(error.message) } finally { setLoading(false) }
   }
 
+  async function updateSeries(item, changes) {
+    if (!supabase || !isAdmin) return false
+    setLoading(true); setMessage('')
+    try {
+      let coverImageUrl = item.cover_image_url
+      if (changes.cover) {
+        const extension = changes.cover.name.split('.').pop() || 'jpg'
+        const path = `series_${item.id}/cover.${extension}`
+        const upload = await supabase.storage.from(STORAGE_BUCKET).upload(path, changes.cover, { upsert: true, contentType: changes.cover.type })
+        if (upload.error) throw upload.error
+        coverImageUrl = getPublicUrl(path)
+      }
+      const { data, error } = await supabase.from('series').update({ title: changes.title, description: changes.description, cover_image_url: coverImageUrl }).eq('id', item.id).select().single()
+      if (error) throw error
+      setSeries((current) => current.map((seriesItem) => seriesItem.id === item.id ? data : seriesItem))
+      setSelectedSeries(data); setMessage('Series updated.'); return true
+    } catch (error) { setMessage(error.message); return false } finally { setLoading(false) }
+  }
+
   const filteredSeries = useMemo(() => series.filter((item) => item.title.toLowerCase().includes(search.toLowerCase())), [series, search])
 
   return (
@@ -150,7 +170,7 @@ function App() {
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
         {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} />}
-        {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} isAdmin={isAdmin} deleteSeries={deleteSeries} deleteChapter={deleteChapter} />}
+        {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} isAdmin={isAdmin} deleteSeries={deleteSeries} deleteChapter={deleteChapter} updateSeries={updateSeries} />}
         {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} />}
         {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
         {!loading && view === 'admin' && isAdmin && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
@@ -192,8 +212,22 @@ function HomeView({ series, openSeries, openAdmin }) {
 function SeriesCard({ series, onClick }) { return <button className="group overflow-hidden rounded-lg bg-[#232323] text-left transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button> }
 function Cover({ series, className = '' }) { return series.cover_image_url ? <img src={series.cover_image_url} alt="" className={`aspect-[2/3] w-full object-cover ${className}`} /> : <div className={`flex aspect-[2/3] items-end bg-gradient-to-br from-[#5c1118] via-[#292929] to-[#111] p-4 ${className}`}><span className="text-2xl font-black">{series.title.slice(0, 1).toUpperCase()}</span></div> }
 
-function SeriesView({ series, chapters, back, openReader, isAdmin, deleteSeries, deleteChapter }) {
-  return <section><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="grid gap-8 md:grid-cols-[220px_1fr]"><Cover series={series} className="rounded-lg" /><div><div className="flex items-start justify-between gap-4"><div><p className="mb-2 text-sm font-bold uppercase tracking-widest text-[#E50914]">Series</p><h1 className="mb-4 text-4xl font-black">{series.title}</h1></div>{isAdmin && <button onClick={() => deleteSeries(series)} className="rounded bg-red-950/60 px-3 py-2 text-xs text-red-200 hover:bg-red-900"><Trash2 className="mr-1 inline h-3 w-3" />Delete series</button>}</div><p className="mb-8 max-w-2xl text-gray-400">{series.description || 'No description yet.'}</p><h2 className="mb-3 text-xl font-bold">Chapters</h2>{chapters.length === 0 ? <EmptyState text="No chapters uploaded yet." /> : <div className="space-y-2">{chapters.map((chapter) => <div key={chapter.id} className="flex items-center gap-2"><button onClick={() => openReader(chapter)} className="flex min-w-0 flex-1 items-center justify-between rounded-lg bg-[#232323] px-4 py-4 text-left hover:bg-[#303030]"><span>Chapter {chapter.chapter_number}</span><span className="text-sm text-gray-500">{chapter.page_count} pages <ChevronRight className="ml-2 inline h-4 w-4" /></span></button>{isAdmin && <button onClick={() => deleteChapter(chapter)} aria-label={`Delete chapter ${chapter.chapter_number}`} className="rounded bg-red-950/60 p-3 text-red-200 hover:bg-red-900"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}</div></div></section>
+function SeriesView({ series, chapters, back, openReader, isAdmin, deleteSeries, deleteChapter, updateSeries }) {
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(series.title)
+  const [description, setDescription] = useState(series.description || '')
+  const [cover, setCover] = useState(null)
+
+  function startEditing() {
+    setTitle(series.title); setDescription(series.description || ''); setCover(null); setEditing(true)
+  }
+
+  async function saveChanges(event) {
+    event.preventDefault()
+    if (await updateSeries(series, { title, description, cover })) { setEditing(false); setCover(null) }
+  }
+
+  return <section><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="grid gap-8 md:grid-cols-[220px_1fr]"><Cover series={series} className="rounded-lg" /><div><div className="flex items-start justify-between gap-4"><div><p className="mb-2 text-sm font-bold uppercase tracking-widest text-[#E50914]">Series</p><h1 className="mb-4 text-4xl font-black">{series.title}</h1></div>{isAdmin && <div className="flex gap-2"><button onClick={startEditing} className="rounded bg-[#303030] px-3 py-2 text-xs text-gray-200 hover:bg-[#3a3a3a]"><Pencil className="mr-1 inline h-3 w-3" />Edit</button><button onClick={() => deleteSeries(series)} className="rounded bg-red-950/60 px-3 py-2 text-xs text-red-200 hover:bg-red-900"><Trash2 className="mr-1 inline h-3 w-3" />Delete</button></div>}</div>{editing ? <form onSubmit={saveChanges} className="mb-8 space-y-3 rounded-lg bg-[#232323] p-4"><input required value={title} onChange={(event) => setTitle(event.target.value)} className="field" placeholder="Title" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} className="field min-h-24" placeholder="Description" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><div className="flex gap-2"><button className="primary-button">Save changes</button><button type="button" onClick={() => setEditing(false)} className="rounded bg-[#303030] px-4 py-3 text-sm">Cancel</button></div></form> : <p className="mb-8 max-w-2xl text-gray-400">{series.description || 'No description yet.'}</p>}<h2 className="mb-3 text-xl font-bold">Chapters</h2>{chapters.length === 0 ? <EmptyState text="No chapters uploaded yet." /> : <div className="space-y-2">{chapters.map((chapter) => <div key={chapter.id} className="flex items-center gap-2"><button onClick={() => openReader(chapter)} className="flex min-w-0 flex-1 items-center justify-between rounded-lg bg-[#232323] px-4 py-4 text-left hover:bg-[#303030]"><span>Chapter {chapter.chapter_number}</span><span className="text-sm text-gray-500">{chapter.page_count} pages <ChevronRight className="ml-2 inline h-4 w-4" /></span></button>{isAdmin && <button onClick={() => deleteChapter(chapter)} aria-label={`Delete chapter ${chapter.chapter_number}`} className="rounded bg-red-950/60 p-3 text-red-200 hover:bg-red-900"><Trash2 className="h-4 w-4" /></button>}</div>)}</div>}</div></div></section>
 }
 
 function ReaderView({ series, chapter, chapters, back, openReader }) {
