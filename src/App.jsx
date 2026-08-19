@@ -268,24 +268,24 @@ function App() {
 }
 
 function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmin, openAdmin, signOut, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount }) {
-  const navClass = (active) => `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition duration-200 active:scale-[0.98] ${active ? 'bg-white/[0.07] text-white' : 'text-gray-400 hover:bg-white/[0.04] hover:text-white'}`
+  const navClass = (active) => `flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition duration-200 active:scale-[0.98] md:justify-start ${active ? 'bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]' : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'}`
   const username = session?.user?.user_metadata?.username || ''
   const menuProps = { username, email: session?.user?.email || '', updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }
-  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/95 shadow-[0_12px_30px_rgba(10,10,10,0.28)] backdrop-blur">
+  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/90 shadow-[0_16px_40px_rgba(10,10,10,0.32)] backdrop-blur-xl">
     <div className="border-b border-white/[0.06]">
-      <div className="mx-auto flex h-16 w-full max-w-[1800px] items-center gap-3 px-4 sm:px-6 lg:px-10">
-        <button aria-label="Go to browse" className="flex shrink-0 items-center gap-2.5 rounded-lg text-lg font-extrabold tracking-[0.12em] transition hover:opacity-90 active:scale-[0.98]" onClick={() => setView('home')}>
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#3b0b0f] ring-1 ring-[#E50914]/30"><BookOpen className="h-5 w-5 text-[#E50914]" /></span>
-          <span className="hidden sm:inline">MANHWA</span>
+      <div className="mx-auto flex h-[4.5rem] w-full max-w-[1800px] items-center gap-3 px-4 sm:px-6 lg:px-10">
+        <button aria-label="Go to browse" className="group flex shrink-0 items-center gap-2.5 rounded-xl transition active:scale-[0.98]" onClick={() => setView('home')}>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3b0b0f] ring-1 ring-[#E50914]/30 transition group-hover:bg-[#4b0e13] group-hover:ring-[#E50914]/50"><BookOpen className="h-5 w-5 text-[#E50914]" /></span>
+          <span className="font-display hidden text-[1.7rem] leading-none tracking-[0.08em] text-white sm:inline">MANHWA</span>
         </button>
-        <nav className="hidden items-center gap-1.5 md:flex">
+        <nav className="hidden items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1 md:flex">
           <button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
           <button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
           {view === 'series' && <span className="ml-2 max-w-48 truncate border-l border-white/10 pl-3 text-sm text-gray-500">{seriesTitle}</span>}
           {view === 'admin' && <span className="ml-2 border-l border-white/10 pl-3 text-sm text-gray-500">Admin</span>}
         </nav>
         <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-          <label className="flex min-w-0 max-w-[360px] flex-1 items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-3 py-2 transition focus-within:border-white/20 focus-within:ring-2 focus-within:ring-[#E50914]/20 md:flex-none">
+          <label className="flex min-h-10 min-w-0 max-w-[360px] flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#202020]/90 px-3 py-2 transition focus-within:border-[#E50914]/60 focus-within:bg-[#242424] focus-within:ring-2 focus-within:ring-[#E50914]/15 md:flex-none">
             <Search className="h-4 w-4 shrink-0 text-gray-500" />
             <span className="sr-only">Search library</span>
             <input aria-label="Search library" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-56" />
@@ -294,8 +294,8 @@ function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmi
         </div>
       </div>
     </div>
-    <div className="border-t border-white/[0.04] bg-[#171717] md:hidden">
-      <nav className="mx-auto flex w-full max-w-[1800px] gap-1.5 overflow-x-auto px-4 py-2 sm:px-6">
+    <div className="border-t border-white/[0.04] bg-[#171717]/90 md:hidden">
+      <nav className="mx-auto flex w-full max-w-[1800px] gap-1.5 overflow-x-auto px-3 py-2 sm:px-6">
         <button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
         <button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
       </nav>
@@ -381,7 +381,7 @@ function UserMenu({ username, email, updateUsername, changePassword, readerWidth
         <div className="border-t border-white/10 bg-[#252525] p-4 sm:px-6"><button type="button" onClick={signOut} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#303030] px-3 py-2.5 text-sm font-semibold text-gray-300 transition hover:bg-[#3a3a3a] hover:text-white active:scale-[0.98]"><SignOut size={18} />Sign out</button></div>
       </div>
     </div>, document.body)
-  return <div className="relative shrink-0"><button aria-label="Open user settings" title={username ? `${username} settings` : 'User settings'} aria-expanded={open} onClick={() => setOpen(!open)} className={`rounded-lg p-2 transition duration-200 active:scale-95 ${open ? 'bg-[#3b0b0f] text-white ring-1 ring-[#E50914]/30' : 'text-gray-400 hover:bg-white/[0.06] hover:text-white'}`}><UserCircle size={20} /></button>{settingsDialog}</div>
+  return <div className="relative shrink-0"><button aria-label="Open user settings" title={username ? `${username} settings` : 'User settings'} aria-expanded={open} onClick={() => setOpen(!open)} className={`flex h-10 w-10 items-center justify-center rounded-xl transition duration-200 active:scale-95 ${open ? 'bg-[#3b0b0f] text-white ring-1 ring-[#E50914]/30' : 'text-gray-400 hover:bg-white/[0.06] hover:text-white'}`}><UserCircle size={20} /></button>{settingsDialog}</div>
 }
 
 function AuthView({ back, onAuthenticated }) {
