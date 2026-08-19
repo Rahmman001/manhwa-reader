@@ -16,7 +16,9 @@ button { cursor: pointer; }
 img { max-width: 100%; }
 .font-display { font-family: var(--font-display); font-weight: 400; }
 .reader-pages { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+.reader-toolbar { transition: transform 260ms ease; }
 .reader-page { display: block; width: 100%; height: auto; }
+.reader-page-shell { contain: layout paint; }
 .genre-scroll { scrollbar-width: none; }
 .genre-scroll::-webkit-scrollbar { display: none; }
 .field { width: 100%; border: 1px solid #444; border-radius: 0.375rem; background: #181818; padding: 0.75rem; color: white; outline: none; }
@@ -33,4 +35,5 @@ img { max-width: 100%; }
 
 @media (prefers-reduced-motion: reduce) {
   html, .reader-pages { scroll-behavior: auto; }
+  .reader-toolbar, .reader-page-shell .transition-opacity { transition: none; }
 }

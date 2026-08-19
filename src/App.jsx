@@ -2,14 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  ArrowUp,
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
+  Heart,
   Home,
   LoaderCircle,
+  Maximize2,
+  Minimize2,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
+  SlidersHorizontal,
   Trash2,
   UploadCloud,
   X,
@@ -67,6 +74,7 @@ function App() {
   const [readerWidth, setReaderWidth] = useState(readReaderWidth)
   const [favorites, setFavorites] = useState(readFavorites(null))
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [sortBy, setSortBy] = useState('recent')
 
   async function refreshSeries() {
     setLoading(true)
@@ -243,12 +251,20 @@ function App() {
   }
 
   const genres = useMemo(() => [...new Set(series.flatMap((item) => extractGenres(item.description || '')))].sort((a, b) => a.localeCompare(b)), [series])
-  const filteredSeries = useMemo(() => series.filter((item) => {
+  const filteredSeries = useMemo(() => {
     const query = search.trim().toLowerCase()
-    const itemGenres = extractGenres(item.description || '')
-    const searchableText = `${item.title} ${item.description || ''} ${itemGenres.join(' ')}`.toLowerCase()
-    return (!query || searchableText.includes(query)) && (!selectedGenre || itemGenres.includes(selectedGenre)) && (!favoritesOnly || favorites.includes(item.id))
-  }), [series, search, selectedGenre, favoritesOnly, favorites])
+    return series.filter((item) => {
+      const itemGenres = extractGenres(item.description || '')
+      const searchableText = `${item.title} ${item.description || ''} ${itemGenres.join(' ')}`.toLowerCase()
+      return (!query || searchableText.includes(query)) && (!selectedGenre || itemGenres.includes(selectedGenre)) && (!favoritesOnly || favorites.includes(item.id))
+    }).sort((a, b) => {
+      if (sortBy === 'title') return a.title.localeCompare(b.title)
+      if (sortBy === 'read') return Number(b.id === lastRead?.seriesId) - Number(a.id === lastRead?.seriesId) || a.title.localeCompare(b.title)
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    })
+  }, [series, search, selectedGenre, favoritesOnly, favorites, sortBy, lastRead?.seriesId])
+
+  const continueSeries = series.find((item) => item.id === lastRead?.seriesId)
 
   return (
     <div className="min-h-screen bg-[#141414] text-white">
@@ -256,8 +272,8 @@ function App() {
       <main className={view === 'reader' ? 'p-0' : 'mx-auto w-full max-w-[1800px] px-4 pb-12 pt-8 sm:px-6 lg:px-10'}>
         {message && <div role="status" className="mb-5 flex items-center justify-between gap-4 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Close notification" className="rounded p-1 text-lg leading-none text-red-200 hover:bg-red-900 hover:text-white"><X className="h-4 w-4" /></button></div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
-        {loading && <div className="flex min-h-40 items-center justify-center"><LoaderCircle className="animate-spin text-[#E50914]" /></div>}
-        {!loading && view === 'home' && <HomeView series={filteredSeries} openSeries={openSeries} openAdmin={openAdmin} genres={genres} selectedGenre={selectedGenre} setSelectedGenre={setSelectedGenre} favoritesOnly={favoritesOnly} setFavoritesOnly={setFavoritesOnly} favoritesCount={favorites.length} favorites={favorites} toggleFavorite={toggleFavorite} />}
+        {loading && <LoadingState />}
+        {!loading && view === 'home' && <HomeView series={filteredSeries} continueSeries={continueSeries} lastRead={lastRead} continueReading={continueReading} openSeries={openSeries} openAdmin={openAdmin} genres={genres} selectedGenre={selectedGenre} setSelectedGenre={setSelectedGenre} favoritesOnly={favoritesOnly} setFavoritesOnly={setFavoritesOnly} favoritesCount={favorites.length} favorites={favorites} toggleFavorite={toggleFavorite} sortBy={sortBy} setSortBy={setSortBy} />}
         {!loading && view === 'series' && <SeriesView series={selectedSeries} chapters={chapters} back={() => setView('home')} openReader={enterReader} isAdmin={isAdmin} deleteSeries={deleteSeries} deleteChapter={deleteChapter} updateSeries={updateSeries} lastRead={lastRead} continueReading={continueReading} />}
         {view === 'reader' && selectedSeries && selectedChapter && <ReaderView series={selectedSeries} chapter={selectedChapter} chapters={chapters} back={leaveReader} openReader={enterReader} readerWidth={readerWidth} updateReaderWidth={updateReaderWidth} />}
         {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
@@ -408,12 +424,20 @@ function AuthView({ back, onAuthenticated }) {
   return <section className="mx-auto max-w-md"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><div className="rounded-xl bg-[#232323] p-6"><h1 className="mb-2 text-3xl font-black">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1><p className="mb-6 text-sm text-gray-400">Only the account added as an admin can upload files.</p><form onSubmit={submit} className="space-y-4">{mode === 'signup' && <input required minLength={2} maxLength={30} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Username" autoComplete="username" className="field" />}<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete="email" className="field" /><input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} className="field" /><button disabled={busy} className="primary-button w-full">{busy ? 'Please wait...' : mode === 'signin' ? 'Sign in' : 'Create account'}</button></form>{message && <p className="mt-4 text-sm text-gray-300">{message}</p>}<button onClick={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setMessage('') }} className="mt-5 text-sm text-gray-400 hover:text-white">{mode === 'signin' ? 'Create a new account' : 'Already have an account? Sign in'}</button></div></section>
 }
 
-function HomeView({ series, openSeries, openAdmin, genres, selectedGenre, setSelectedGenre, favoritesOnly, setFavoritesOnly, favoritesCount, favorites, toggleFavorite }) {
-  return <section><div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-6 sm:p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-3xl font-black sm:text-4xl md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-md bg-[#E50914] px-5 py-3 font-bold hover:bg-red-700">Upload a chapter</button></div></div><div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">Library</p><h2 className="text-2xl font-bold tracking-tight">Your series</h2></div><div className="flex items-center gap-3"><span className="text-sm text-gray-500">{series.length} titles</span><button onClick={() => setFavoritesOnly(!favoritesOnly)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${favoritesOnly ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{favoritesOnly ? 'Favorites' : `Favorites ${favoritesCount}`}</button></div></div>{genres.length > 0 && <div className="mb-8"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Browse by genre</h3>{selectedGenre && <button onClick={() => setSelectedGenre('')} className="text-xs font-semibold text-[#E50914] hover:text-red-300">Clear</button>}</div><div className="genre-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"><button aria-pressed={selectedGenre === ''} onClick={() => setSelectedGenre('')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === '' ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>All</button>{genres.map((genre) => <button aria-pressed={selectedGenre === genre} key={genre} onClick={() => setSelectedGenre(selectedGenre === genre ? '' : genre)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === genre ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{genre}</button>)}</div></div>}{series.length === 0 ? <EmptyState text={favoritesOnly ? 'No favorites yet. Tap the star on a series to save it.' : selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid grid-cols-[repeat(auto-fill,minmax(125px,170px))] justify-start gap-3 sm:gap-4">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} isFavorite={favorites.includes(item.id)} toggleFavorite={() => toggleFavorite(item)} />)}</div>}</section>
+function HomeView({ series, continueSeries, lastRead, continueReading, openSeries, openAdmin, genres, selectedGenre, setSelectedGenre, favoritesOnly, setFavoritesOnly, favoritesCount, favorites, toggleFavorite, sortBy, setSortBy }) {
+  return (
+    <section>
+      {continueSeries && lastRead && <div className="mb-8 flex items-center gap-4 rounded-xl border border-white/10 bg-[#202020] p-3 sm:p-4"><Cover series={continueSeries} className="h-20 w-14 shrink-0 rounded-lg" /><div className="min-w-0 flex-1"><p className="mb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#E50914]">Continue reading</p><h2 className="truncate font-bold text-white">{continueSeries.title}</h2><p className="mt-1 text-xs text-gray-500">Chapter {lastRead.chapterNumber}</p></div><button onClick={continueReading} className="shrink-0 rounded-lg bg-[#E50914] px-3 py-2.5 text-xs font-bold text-white transition hover:bg-red-700 active:scale-[0.98] sm:px-4 sm:text-sm">Continue</button></div>}
+      <div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-6 sm:p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-3xl font-black sm:text-4xl md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-lg bg-[#E50914] px-5 py-3 font-bold text-white transition hover:bg-red-700 active:scale-[0.99]">Upload a chapter</button></div></div>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">Library</p><h2 className="text-2xl font-bold tracking-tight">Your series</h2></div><div className="flex flex-wrap items-center gap-2 sm:gap-3"><span className="text-sm text-gray-500">{series.length} titles</span><button onClick={() => setFavoritesOnly(!favoritesOnly)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${favoritesOnly ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{favoritesOnly ? 'Favorites' : `Favorites ${favoritesCount}`}</button><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-2.5 py-1.5 text-xs text-gray-400"><SlidersHorizontal className="h-3.5 w-3.5" /><span className="sr-only">Sort series</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="bg-transparent text-xs text-gray-300 outline-none"><option value="recent">Recently added</option><option value="title">A to Z</option><option value="read">Recently read</option></select></label></div></div>
+      {genres.length > 0 && <div className="mb-8"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Browse by genre</h3>{selectedGenre && <button onClick={() => setSelectedGenre('')} className="text-xs font-semibold text-[#E50914] hover:text-red-300">Clear</button>}</div><div className="genre-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"><button aria-pressed={selectedGenre === ''} onClick={() => setSelectedGenre('')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === '' ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>All</button>{genres.map((genre) => <button aria-pressed={selectedGenre === genre} key={genre} onClick={() => setSelectedGenre(selectedGenre === genre ? '' : genre)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === genre ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{genre}</button>)}</div></div>}
+      {series.length === 0 ? <EmptyState text={favoritesOnly ? 'No favorites yet. Tap the heart on a series to save it.' : selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid grid-cols-[repeat(auto-fill,minmax(125px,170px))] justify-start gap-3 sm:gap-4">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} isFavorite={favorites.includes(item.id)} toggleFavorite={() => toggleFavorite(item)} />)}</div>}
+    </section>
+  )
 }
 
-function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) { return <div className="group relative overflow-hidden rounded-lg bg-[#232323] transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]"><button className="block w-full text-left" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate pr-7 font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button><button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} onClick={toggleFavorite} className="absolute right-2 top-2 rounded-full bg-black/60 p-2 text-gray-300 backdrop-blur hover:text-yellow-300"><span className={isFavorite ? 'text-yellow-300' : ''}>★</span></button></div> }
-function Cover({ series, className = '' }) { return series.cover_image_url ? <img src={series.cover_image_url} alt="" className={`aspect-[2/3] w-full object-cover ${className}`} /> : <div className={`flex aspect-[2/3] items-end bg-gradient-to-br from-[#5c1118] via-[#292929] to-[#111] p-4 ${className}`}><span className="text-2xl font-black">{series.title.slice(0, 1).toUpperCase()}</span></div> }
+function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) { return <div className="group relative overflow-hidden rounded-lg bg-[#232323] transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]"><button className="block w-full text-left" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate pr-7 font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button><button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} onClick={toggleFavorite} className="absolute right-2 top-2 rounded-full bg-black/60 p-2 text-gray-300 backdrop-blur transition hover:text-red-300 active:scale-95"><Heart className="h-4 w-4" fill={isFavorite ? 'currentColor' : 'none'} /></button></div> }
+function Cover({ series, className = '' }) { return series.cover_image_url ? <img src={series.cover_image_url} alt={`${series.title} cover`} className={`aspect-[2/3] w-full object-cover ${className}`} /> : <div className={`flex aspect-[2/3] items-end bg-gradient-to-br from-[#5c1118] via-[#292929] to-[#111] p-4 ${className}`}><span className="text-2xl font-black">{series.title.slice(0, 1).toUpperCase()}</span></div> }
 
 function SeriesView({ series, chapters, back, openReader, isAdmin, deleteSeries, deleteChapter, updateSeries, lastRead, continueReading }) {
   const [editing, setEditing] = useState(false)
@@ -442,6 +466,8 @@ function ReaderView({ series, chapter, chapters, back, openReader, readerWidth, 
   const next = chapters[index + 1]
   const [width, setWidth] = useState(readerWidth)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement))
+  const [showReaderBar, setShowReaderBar] = useState(true)
   const progressKey = `manhwa-reader-progress:${series.id}:${chapter.id}`
   const restoredKey = useRef('')
   const currentPageRef = useRef(1)
@@ -460,6 +486,27 @@ function ReaderView({ series, chapter, chapters, back, openReader, readerWidth, 
     if (deltaX < 0 && next) openReader(next)
     if (deltaX > 0 && previous) openReader(previous)
   }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen?.()
+    } catch { /* Fullscreen is optional. */ }
+  }
+
+  useEffect(() => {
+    const syncFullscreen = () => setIsFullscreen(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen)
+  }, [])
+
+  useEffect(() => {
+    const sentinel = document.getElementById(`reader-top-${chapter.id}`)
+    if (!sentinel) return undefined
+    const observer = new IntersectionObserver(([entry]) => setShowReaderBar(entry.isIntersecting), { threshold: 0 })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [chapter.id])
 
   useEffect(() => {
     const savedPage = readReaderProgress(progressKey, chapter.page_count)
@@ -494,7 +541,54 @@ function ReaderView({ series, chapter, chapters, back, openReader, readerWidth, 
 
   useEffect(() => { setWidth(readerWidth) }, [readerWidth])
 
-  return <section onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} className="reader-pages min-h-screen bg-black"><div className="sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-2 py-2 backdrop-blur sm:px-4 sm:py-3"><div className="flex items-center justify-between gap-2"><button onClick={back} className="flex min-h-10 items-center gap-1 rounded px-2 text-sm text-gray-300 hover:bg-[#303030] hover:text-white sm:gap-2 sm:px-3"><ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Exit reader</span><span className="sm:hidden">Exit</span></button><span className="min-w-0 truncate text-xs font-bold sm:text-sm">{series.title} - Chapter {chapter.chapter_number}</span><select value={width} onChange={(event) => { setWidth(event.target.value); updateReaderWidth(event.target.value) }} className="min-h-10 rounded bg-[#303030] px-2 text-xs"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select></div></div><div className="pointer-events-none fixed bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#181818]/90 px-2 py-1 text-[10px] text-gray-400 shadow backdrop-blur">{currentPage}/{chapter.page_count}</div><div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>{!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}{isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, index) => index + 1).map((page) => <img id={`reader-page-${chapter.id}-${page}`} data-reader-page="true" data-page={page} key={page} loading="lazy" decoding="async" src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} alt={`Page ${page}`} className="reader-page" />)}</div><div className="mx-auto flex max-w-4xl gap-3 p-4 sm:justify-between sm:gap-4 sm:p-5"><button disabled={!previous} onClick={() => openReader(previous)} className="min-h-12 flex-1 rounded bg-[#232323] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button><button disabled={!next} onClick={() => openReader(next)} className="min-h-12 flex-1 rounded bg-[#E50914] px-3 py-3 text-sm disabled:opacity-30 sm:flex-none sm:px-4">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button></div></section>
+  return (
+    <section onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} className="reader-pages min-h-[100dvh] bg-black">
+      <div id={`reader-top-${chapter.id}`} className="h-px w-px" aria-hidden="true" />
+      <div className={`reader-toolbar sticky top-0 z-10 border-b border-white/10 bg-[#181818]/95 px-2 py-2 backdrop-blur sm:px-4 sm:py-3 ${showReaderBar ? 'translate-y-0' : '-translate-y-full pointer-events-none'}`}>
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-2">
+          <button onClick={back} className="reader-control flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm text-gray-300 hover:bg-[#303030] hover:text-white sm:gap-2 sm:px-3">
+            <ArrowLeft className="h-4 w-4" /><span className="hidden sm:inline">Exit reader</span><span className="sm:hidden">Exit</span>
+          </button>
+          <span className="min-w-0 flex-1 truncate text-center text-xs font-bold sm:text-sm">{series.title} - Chapter {chapter.chapter_number}</span>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Back to top" title="Back to top" className="reader-control flex min-h-10 items-center gap-1 rounded-lg px-2 text-xs text-gray-400 hover:bg-[#303030] hover:text-white sm:px-3"><ArrowUp className="h-4 w-4" /><span className="hidden sm:inline">Top</span></button>
+            <button onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} className="reader-control flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 hover:bg-[#303030] hover:text-white">{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+            <label className="sr-only" htmlFor="reader-width">Reader width</label>
+            <select id="reader-width" value={width} onChange={(event) => { setWidth(event.target.value); updateReaderWidth(event.target.value) }} className="min-h-10 max-w-[92px] rounded-lg border border-white/10 bg-[#303030] px-2 text-xs text-white outline-none focus:border-[#E50914] sm:max-w-none"><option value="wide">Fit width</option><option value="fixed">800px</option><option value="full">100%</option></select>
+          </div>
+        </div>
+      </div>
+      <div className="pointer-events-none fixed bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-[#181818]/90 px-2.5 py-1 text-[10px] text-gray-400 shadow backdrop-blur">{currentPage}/{chapter.page_count}</div>
+      <div className={`mx-auto ${width === 'fixed' ? 'max-w-[800px]' : width === 'full' ? 'max-w-none' : 'max-w-4xl'}`}>
+        {!isSupabaseConfigured && <div className="p-8 text-center text-gray-400">Configure Supabase to load chapter images.</div>}
+        {isSupabaseConfigured && Array.from({ length: chapter.page_count }, (_, pageIndex) => pageIndex + 1).map((page) => <ReaderPage key={page} id={`reader-page-${chapter.id}-${page}`} page={page} pageCount={chapter.page_count} src={getPublicUrl(chapterPagePath(series.id, chapter.chapter_number, page))} />)}
+      </div>
+      <div className="mx-auto flex max-w-4xl gap-3 p-4 sm:justify-between sm:gap-4 sm:p-5">
+        <button disabled={!previous} onClick={() => openReader(previous)} className="min-h-12 flex-1 rounded-lg bg-[#232323] px-3 py-3 text-sm transition hover:bg-[#303030] active:scale-[0.99] disabled:opacity-30 sm:flex-none sm:px-4"><ChevronLeft className="mr-1 inline h-4 w-4" />Previous</button>
+        <button disabled={!next} onClick={() => openReader(next)} className="min-h-12 flex-1 rounded-lg bg-[#E50914] px-3 py-3 text-sm font-bold transition hover:bg-red-700 active:scale-[0.99] disabled:opacity-30 sm:flex-none sm:px-4">Next<ChevronRight className="ml-1 inline h-4 w-4" /></button>
+      </div>
+    </section>
+  )
+}
+
+function ReaderPage({ id, page, pageCount, src }) {
+  const [loaded, setLoaded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
+
+  function retry() {
+    setLoaded(false)
+    setFailed(false)
+    setRetryKey((value) => value + 1)
+  }
+
+  return (
+    <div id={id} data-reader-page="true" data-page={page} aria-busy={!loaded && !failed} className="reader-page-shell relative min-h-[180px] bg-[#181818]">
+      {!loaded && !failed && <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-[#181818] via-[#242424] to-[#181818]" aria-hidden="true" />}
+      <img key={retryKey} loading={page === 1 ? 'eager' : 'lazy'} fetchPriority={page === 1 ? 'high' : 'auto'} decoding="async" src={src} alt={`Page ${page} of ${pageCount}`} onLoad={() => setLoaded(true)} onError={() => { setLoaded(false); setFailed(true) }} className={`reader-page relative transition-opacity duration-300 ${failed ? 'hidden' : loaded ? 'opacity-100' : 'opacity-0'}`} />
+      {failed && <div role="alert" className="flex min-h-[180px] flex-col items-center justify-center gap-3 p-6 text-center text-sm text-gray-400"><CircleAlert className="h-5 w-5 text-[#E50914]" /><p>Page {page} could not load.</p><button type="button" onClick={retry} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[#303030] px-3 py-2 text-xs font-semibold text-gray-200 transition hover:bg-[#3a3a3a] active:scale-[0.98]"><RotateCcw className="h-3.5 w-3.5" />Retry</button></div>}
+    </div>
+  )
 }
 
 function AdminView({ series, refreshSeries, back, setMessage }) {
@@ -503,7 +597,7 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
   const [cover, setCover] = useState(null)
   const [seriesId, setSeriesId] = useState('')
   const [chapterFiles, setChapterFiles] = useState([])
-  const [progress, setProgress] = useState('')
+  const [uploadStats, setUploadStats] = useState({ text: '', currentPage: 0, pageCount: 0, completed: 0, total: 0, failed: 0 })
   const [busy, setBusy] = useState(false)
   const filesInput = useRef(null)
   const folderInput = useRef(null)
@@ -535,7 +629,14 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
   }
 
   async function uploadChapterFile(file, number, label) {
-    const result = await processPdfAndUpload(file, { seriesId, chapterNumber: number, onProgress: (text) => setProgress(`${label}: ${text}`) })
+    const result = await processPdfAndUpload(file, {
+      seriesId,
+      chapterNumber: number,
+      onProgress: (text) => {
+        const pageMatch = text.match(/page (\d+) of (\d+)/i)
+        setUploadStats((current) => ({ ...current, text: `${label}: ${text}`, currentPage: pageMatch ? Number(pageMatch[1]) : current.currentPage, pageCount: pageMatch ? Number(pageMatch[2]) : current.pageCount }))
+      },
+    })
     const { error } = await supabase.from('chapters').upsert({ series_id: seriesId, chapter_number: number, page_count: result.pageCount }, { onConflict: 'series_id,chapter_number' })
     if (error) throw error
   }
@@ -549,30 +650,36 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
 
     setBusy(true); setMessage('')
     const failed = []
+    setUploadStats({ text: 'Starting upload...', currentPage: 0, pageCount: 0, completed: 0, total: chapterFiles.length, failed: 0 })
     try {
       for (const [index, item] of chapterFiles.entries()) {
         const label = `Chapter ${item.chapterNumber} (${index + 1}/${chapterFiles.length})`
         try {
           await uploadChapterFile(item.file, item.chapterNumber, label)
+          setUploadStats((current) => ({ ...current, text: `${label}: complete`, currentPage: 0, pageCount: 0, completed: index + 1 }))
         } catch (error) {
           failed.push({ item, error })
-          setProgress(`${label} failed: ${error.message}`)
+          setUploadStats((current) => ({ ...current, text: `${label} failed: ${error.message}`, failed: failed.length }))
         }
       }
       if (failed.length) {
         setChapterFiles(failed.map(({ item }) => item))
         const failedNumbers = failed.map(({ item }) => item.chapterNumber).join(', ')
         setMessage(`Upload finished with ${failed.length} failed chapter(s): ${failedNumbers}. Select Upload again to retry them.`)
-        setProgress(`Uploaded ${chapterFiles.length - failed.length}; failed ${failed.length}.`)
+        setUploadStats((current) => ({ ...current, text: `Uploaded ${chapterFiles.length - failed.length}; ${failed.length} failed.`, failed: failed.length }))
       } else {
-        setChapterFiles([]); setProgress(`Uploaded ${chapterFiles.length} chapters.`)
+        setChapterFiles([]); setUploadStats((current) => ({ ...current, text: `Uploaded ${chapterFiles.length} chapters.`, completed: chapterFiles.length, currentPage: 0, pageCount: 0 }))
       }
     } finally { setBusy(false) }
   }
 
-  return <section className="mx-auto w-full max-w-[1400px]"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><h1 className="mb-8 text-4xl font-black">Admin</h1><div className="grid gap-6 md:grid-cols-2"><form onSubmit={createSeries} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">New series</h2><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" className="field" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="field min-h-28" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><Plus className="inline h-4 w-4" /> Create series</button></form><form onSubmit={uploadChapters} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">Upload chapters</h2><select required value={seriesId} onChange={(event) => setSeriesId(event.target.value)} className="field"><option value="">Choose series</option>{series.filter((item) => !item.id.startsWith('demo-')).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><div className="flex gap-2"><button type="button" onClick={() => filesInput.current?.click()} className="flex-1 rounded bg-[#303030] px-3 py-2 text-sm hover:bg-[#3a3a3a]">Choose PDF files</button><button type="button" onClick={() => folderInput.current?.click()} className="flex-1 rounded bg-[#303030] px-3 py-2 text-sm hover:bg-[#3a3a3a]">Choose folder</button></div><input ref={filesInput} type="file" accept=".pdf,application/pdf" multiple onChange={selectChapterFiles} className="hidden" /><input ref={folderInput} type="file" accept=".pdf,application/pdf" multiple webkitdirectory="" directory="" onChange={selectChapterFiles} className="hidden" /><p className="text-xs text-gray-500">Choose one PDF, multiple PDFs, or a folder. Filenames need a chapter number, such as Chapter 1.pdf.</p>{chapterFiles.length > 0 && <div className="max-h-32 overflow-auto rounded bg-[#181818] p-3 text-xs text-gray-400">{chapterFiles.map((item) => <div key={`${item.file.name}-${item.file.lastModified}`}>{item.chapterNumber === null ? '?' : `Chapter ${item.chapterNumber}`} - {item.file.name}</div>)}</div>}<button disabled={busy} className="primary-button"><UploadCloud className="inline h-4 w-4" /> Upload {chapterFiles.length || ''} chapters</button>{progress && <p className="text-sm text-gray-400">{progress}</p>}</form></div></section>
+  const uploadPercent = uploadStats.total ? Math.min(100, Math.round(((uploadStats.completed + (uploadStats.pageCount ? uploadStats.currentPage / uploadStats.pageCount : 0)) / uploadStats.total) * 100)) : 0
+  return <section className="mx-auto w-full max-w-[1400px]"><button onClick={back} className="mb-6 flex items-center gap-2 text-sm text-gray-400 hover:text-white"><ArrowLeft className="h-4 w-4" />Back to browse</button><h1 className="mb-8 text-4xl font-black">Admin</h1><div className="grid gap-6 md:grid-cols-2"><form onSubmit={createSeries} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">New series</h2><input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Title" className="field" /><textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Description" className="field min-h-28" /><input type="file" accept="image/*" onChange={(event) => setCover(event.target.files?.[0] || null)} className="field file:mr-3 file:rounded file:border-0 file:bg-[#E50914] file:px-3 file:py-2 file:text-white" /><button disabled={busy} className="primary-button"><Plus className="inline h-4 w-4" /> Create series</button></form><form onSubmit={uploadChapters} className="space-y-4 rounded-xl bg-[#232323] p-5"><h2 className="text-xl font-bold">Upload chapters</h2><select required value={seriesId} onChange={(event) => setSeriesId(event.target.value)} className="field"><option value="">Choose series</option>{series.filter((item) => !item.id.startsWith('demo-')).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><div className="flex gap-2"><button type="button" onClick={() => filesInput.current?.click()} className="flex-1 rounded bg-[#303030] px-3 py-2 text-sm hover:bg-[#3a3a3a]">Choose PDF files</button><button type="button" onClick={() => folderInput.current?.click()} className="flex-1 rounded bg-[#303030] px-3 py-2 text-sm hover:bg-[#3a3a3a]">Choose folder</button></div><input ref={filesInput} type="file" accept=".pdf,application/pdf" multiple onChange={selectChapterFiles} className="hidden" /><input ref={folderInput} type="file" accept=".pdf,application/pdf" multiple webkitdirectory="" directory="" onChange={selectChapterFiles} className="hidden" /><p className="text-xs text-gray-500">Choose one PDF, multiple PDFs, or a folder. Filenames need a chapter number, such as Chapter 1.pdf.</p>{chapterFiles.length > 0 && <div className="max-h-32 overflow-auto rounded bg-[#181818] p-3 text-xs text-gray-400">{chapterFiles.map((item) => <div key={`${item.file.name}-${item.file.lastModified}`}>{item.chapterNumber === null ? '?' : `Chapter ${item.chapterNumber}`} - {item.file.name}</div>)}</div>}{uploadStats.text && <div className="rounded-lg border border-white/10 bg-[#181818] p-3"><div className="mb-2 flex items-center justify-between gap-3 text-xs"><span className="min-w-0 truncate text-gray-300">{uploadStats.text}</span><span className="shrink-0 text-gray-500">{uploadStats.completed}/{uploadStats.total}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-[#303030]"><div className="h-full rounded-full bg-[#E50914] transition-[width] duration-300" style={{ width: `${uploadPercent}%` }} /></div><div className="mt-2 flex items-center justify-between text-[11px] text-gray-500"><span>{uploadPercent}% complete</span>{uploadStats.failed > 0 && <span className="text-red-300">{uploadStats.failed} failed</span>}</div></div>}<button disabled={busy} className="primary-button"><UploadCloud className="inline h-4 w-4" /> Upload {chapterFiles.length || ''} chapters</button></form></div></section>
 }
 
+function LoadingState() {
+  return <div className="space-y-5" aria-label="Loading library" aria-busy="true"><div className="h-48 animate-pulse rounded-xl bg-[#232323] sm:h-56" /><div className="flex items-center gap-3"><LoaderCircle className="h-4 w-4 animate-spin text-[#E50914]" /><span className="text-sm text-gray-500">Loading your library</span></div><div className="grid grid-cols-[repeat(auto-fill,minmax(125px,170px))] gap-3 sm:gap-4">{[1, 2, 3, 4, 5].map((item) => <div key={item} className="overflow-hidden rounded-lg bg-[#232323]"><div className="aspect-[2/3] animate-pulse bg-[#2b2b2b]" /><div className="h-12 animate-pulse bg-[#242424]" /></div>)}</div></div>
+}
 function EmptyState({ text }) { return <div className="rounded-lg border border-dashed border-white/15 p-8 text-center text-gray-500">{text}</div> }
 function readReaderProgress(key, pageCount) {
   try {

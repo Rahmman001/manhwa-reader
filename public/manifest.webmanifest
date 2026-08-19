@@ -1,0 +1,17 @@
+{
+  "name": "Manhwa Reader",
+  "short_name": "Manhwa",
+  "description": "A private, focused space for reading your manhwa library.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#141414",
+  "theme_color": "#141414",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
