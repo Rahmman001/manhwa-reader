@@ -120,10 +120,10 @@ function App() {
     setFavoritesOnly(false)
   }, [session?.user?.id])
 
-  async function openSeries(item) {
-    const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 1100
+  async function openSeries(item, origin) {
+    const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 1600
     const startedAt = performance.now()
-    setOpeningSeries(item); setMessage('')
+    setOpeningSeries({ series: item, origin }); setMessage('')
     try {
       const nextChapters = await fetchChapters(item.id)
       const remaining = Math.max(0, duration - (performance.now() - startedAt))
@@ -286,7 +286,7 @@ function App() {
         {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
         {!loading && view === 'admin' && isAdmin && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
       </main>
-      {openingSeries && <SeriesOpenTransition series={openingSeries} />}
+      {openingSeries && <SeriesOpenTransition series={openingSeries.series} origin={openingSeries.origin} />}
     </div>
   )
 }
@@ -447,25 +447,37 @@ function HomeView({ series, continueSeries, lastRead, continueReading, openSerie
       <div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-6 sm:p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-3xl font-black sm:text-4xl md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-lg bg-[#E50914] px-5 py-3 font-bold text-white transition hover:bg-red-700 active:scale-[0.99]">Upload a chapter</button></div></div>
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">Library</p><h2 className="text-2xl font-bold tracking-tight">Your series</h2></div><div className="flex flex-wrap items-center gap-2 sm:gap-3"><span className="text-sm text-gray-500">{series.length} titles</span><button onClick={() => setFavoritesOnly(!favoritesOnly)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${favoritesOnly ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{favoritesOnly ? 'Favorites' : `Favorites ${favoritesCount}`}</button><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-2.5 py-1.5 text-xs text-gray-400"><SlidersHorizontal className="h-3.5 w-3.5" /><span className="sr-only">Sort series</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="bg-transparent text-xs text-gray-300 outline-none"><option value="recent">Recently added</option><option value="title">A to Z</option><option value="read">Recently read</option></select></label></div></div>
       {genres.length > 0 && <div className="mb-8"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Browse by genre</h3>{selectedGenre && <button onClick={() => setSelectedGenre('')} className="text-xs font-semibold text-[#E50914] hover:text-red-300">Clear</button>}</div><div className="genre-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"><button aria-pressed={selectedGenre === ''} onClick={() => setSelectedGenre('')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === '' ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>All</button>{genres.map((genre) => <button aria-pressed={selectedGenre === genre} key={genre} onClick={() => setSelectedGenre(selectedGenre === genre ? '' : genre)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === genre ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{genre}</button>)}</div></div>}
-      {series.length === 0 ? <EmptyState text={favoritesOnly ? 'No favorites yet. Tap the heart on a series to save it.' : selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} isFavorite={favorites.includes(item.id)} toggleFavorite={() => toggleFavorite(item)} />)}</div>}
+      {series.length === 0 ? <EmptyState text={favoritesOnly ? 'No favorites yet. Tap the heart on a series to save it.' : selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={(origin) => openSeries(item, origin)} isFavorite={favorites.includes(item.id)} toggleFavorite={() => toggleFavorite(item)} />)}</div>}
     </section>
   )
 }
 
 function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) {
   const genre = extractGenres(series.description || '')[0]
+  function openFromCard(event) {
+    const cover = event.currentTarget.querySelector('[data-series-cover]')
+    const rect = cover?.getBoundingClientRect()
+    onClick(rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : undefined)
+  }
   return <article className="group relative min-w-0 overflow-hidden rounded-xl border border-white/[0.08] bg-[#202020] shadow-[0_12px_28px_rgba(10,10,10,0.18)] transition duration-300 md:hover:-translate-y-1 md:hover:border-white/20 md:hover:shadow-[0_18px_36px_rgba(10,10,10,0.28)] focus-within:border-[#E50914]/70 focus-within:ring-2 focus-within:ring-[#E50914]/20">
-    <button className="block w-full text-left focus-visible:outline-none" onClick={onClick}>
-      <div className="relative overflow-hidden bg-[#181818]"><Cover series={series} className="transition duration-500 ease-out md:group-hover:scale-[1.04]" /><div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#202020]/70 to-transparent opacity-80" /></div>
+    <button className="block w-full text-left focus-visible:outline-none" onClick={openFromCard}>
+      <div data-series-cover className="relative overflow-hidden bg-[#181818]"><Cover series={series} className="transition duration-500 ease-out md:group-hover:scale-[1.04]" /><div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#202020]/70 to-transparent opacity-80" /></div>
       <div className="border-t border-white/[0.07] p-3 sm:p-3.5"><div className="flex items-center gap-2"><h3 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{series.title}</h3><CardArrow className="h-4 w-4 shrink-0 text-gray-600 transition duration-300 md:group-hover:translate-x-0.5 md:group-hover:-translate-y-0.5 md:group-hover:text-[#E50914]" /></div><p className="mt-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 sm:text-[11px]">{genre || 'Read series'}</p></div>
     </button>
     <button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} aria-pressed={isFavorite} onClick={toggleFavorite} className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#141414]/75 text-gray-300 backdrop-blur transition hover:border-red-300/40 hover:text-red-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/70"><FavoriteHeart size={16} weight={isFavorite ? 'fill' : 'regular'} /></button>
   </article>
 }
 
-function SeriesOpenTransition({ series }) {
+function SeriesOpenTransition({ series, origin }) {
+  const targetWidth = Math.min(window.innerWidth * 0.62, 260)
+  const startScale = origin?.width ? origin.width / targetWidth : 0.72
+  const style = origin ? {
+    '--series-start-x': `${origin.left + origin.width / 2}px`,
+    '--series-start-y': `${origin.top + origin.height / 2}px`,
+    '--series-start-scale': startScale,
+  } : undefined
   return <div className="series-transition-overlay" role="status" aria-label={`Opening ${series.title}`}>
-    <div className="series-transition-card">
+    <div className="series-transition-card" style={style}>
       <div className="series-transition-face"><Cover series={series} className="rounded-2xl" /></div>
       <div className="series-transition-face series-transition-back rounded-2xl bg-[#3b0b0f] p-5 text-center"><span className="font-display text-xl text-white">{series.title}</span></div>
     </div>
