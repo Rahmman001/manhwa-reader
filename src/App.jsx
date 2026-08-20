@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  Heart,
   Home,
   LoaderCircle,
   Maximize2,
@@ -21,7 +20,7 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react'
-import { Key, MonitorPlay, SignOut, Trash, UserCircle, X as ProfileX } from '@phosphor-icons/react'
+import { ArrowUpRight as CardArrow, Heart as FavoriteHeart, Key, MonitorPlay, SignOut, Trash, UserCircle, X as ProfileX } from '@phosphor-icons/react'
 import { processPdfAndUpload, chapterFolder } from './pdfProcessor'
 import { getPublicUrl, isSupabaseConfigured, supabase, STORAGE_BUCKET } from './supabase'
 
@@ -440,7 +439,16 @@ function HomeView({ series, continueSeries, lastRead, continueReading, openSerie
   )
 }
 
-function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) { return <div className="group relative overflow-hidden rounded-lg bg-[#232323] transition hover:-translate-y-1 hover:ring-2 hover:ring-[#E50914]"><button className="block w-full text-left" onClick={onClick}><Cover series={series} /><div className="p-3"><h3 className="truncate pr-7 font-bold">{series.title}</h3><p className="mt-1 text-xs text-gray-500">Open series</p></div></button><button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} onClick={toggleFavorite} className="absolute right-2 top-2 rounded-full bg-black/60 p-2 text-gray-300 backdrop-blur transition hover:text-red-300 active:scale-95"><Heart className="h-4 w-4" fill={isFavorite ? 'currentColor' : 'none'} /></button></div> }
+function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) {
+  const genre = extractGenres(series.description || '')[0]
+  return <article className="group relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#202020] shadow-[0_12px_28px_rgba(10,10,10,0.18)] transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_18px_36px_rgba(10,10,10,0.28)] focus-within:border-[#E50914]/70 focus-within:ring-2 focus-within:ring-[#E50914]/20">
+    <button className="block w-full text-left focus-visible:outline-none" onClick={onClick}>
+      <div className="relative overflow-hidden bg-[#181818]"><Cover series={series} className="transition duration-500 ease-out group-hover:scale-[1.04]" /><div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#202020]/70 to-transparent opacity-80" /></div>
+      <div className="border-t border-white/[0.07] p-3.5"><div className="flex items-center gap-2"><h3 className="min-w-0 flex-1 truncate font-bold text-white">{series.title}</h3><CardArrow className="h-4 w-4 shrink-0 text-gray-600 transition duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[#E50914]" /></div><p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">{genre || 'Read series'}</p></div>
+    </button>
+    <button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} aria-pressed={isFavorite} onClick={toggleFavorite} className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#141414]/75 text-gray-300 backdrop-blur transition hover:border-red-300/40 hover:text-red-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/70"><FavoriteHeart size={16} weight={isFavorite ? 'fill' : 'regular'} /></button>
+  </article>
+}
 function Cover({ series, className = '' }) {
   const hasCustomWidth = /\b(?:w-|max-w-)/.test(className)
   const widthClass = hasCustomWidth ? '' : 'w-full'
