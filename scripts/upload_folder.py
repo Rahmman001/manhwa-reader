@@ -19,6 +19,7 @@ ENV_FILE = PROJECT_ROOT / ".env.uploader"
 STORAGE_BUCKET = "manhwa"
 WEBP_QUALITY = 85
 RENDER_SCALE = 1.5
+WEBP_MAX_DIMENSION = 16000
 
 
 def chapter_number_from_name(filename):
@@ -53,7 +54,9 @@ def list_existing_pages(storage, folder):
 
 
 def render_page(page):
-    pixmap = page.get_pixmap(matrix=fitz.Matrix(RENDER_SCALE, RENDER_SCALE), alpha=False)
+    page_dimension = max(page.rect.width, page.rect.height, 1)
+    scale = min(RENDER_SCALE, WEBP_MAX_DIMENSION / page_dimension)
+    pixmap = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
     image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
     output = io.BytesIO()
     image.save(output, format="WEBP", quality=WEBP_QUALITY, method=6)
