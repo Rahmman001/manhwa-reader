@@ -268,7 +268,7 @@ function App() {
   return (
     <div className="min-h-screen bg-[#141414] text-white">
       {view !== 'reader' && <Header view={view} seriesTitle={selectedSeries?.title} setView={setView} search={search} setSearch={setSearch} session={session} isAdmin={isAdmin} openAdmin={openAdmin} signOut={signOut} updateUsername={updateUsername} changePassword={changePassword} readerWidth={readerWidth} updateReaderWidth={updateReaderWidth} clearReadingProgress={clearReadingProgress} clearFavorites={clearFavorites} favoritesCount={favorites.length} deleteAccount={deleteAccount} />}
-      <main className={view === 'reader' ? 'p-0' : 'mx-auto w-full max-w-[1800px] px-4 pb-12 pt-8 sm:px-6 lg:px-10'}>
+      <main className={view === 'reader' ? 'p-0' : 'mx-auto w-full max-w-[1440px] px-3 pb-12 pt-6 sm:px-6 sm:pt-8 lg:px-10'}>
         {message && <div role="status" className="mb-5 flex items-center justify-between gap-4 rounded-lg border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200"><span>{message}</span><button onClick={() => setMessage('')} aria-label="Close notification" className="rounded p-1 text-lg leading-none text-red-200 hover:bg-red-900 hover:text-white"><X className="h-4 w-4" /></button></div>}
         {!isSupabaseConfigured && view !== 'reader' && <div className="mb-6 rounded-lg border border-yellow-500/30 bg-yellow-950/30 p-4 text-sm text-yellow-100">Supabase is not configured. Add the Vite environment variables to load your library and upload chapters.</div>}
         {loading && <LoadingState />}
@@ -283,17 +283,18 @@ function App() {
 }
 
 function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmin, openAdmin, signOut, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount }) {
-  const navClass = (active) => `group flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/60 md:justify-start ${active ? 'bg-[#3b0b0f] text-white shadow-[inset_0_0_0_1px_rgba(229,9,20,0.18)]' : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'}`
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+  const navClass = (active) => `group flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/60 md:justify-start ${active ? 'bg-[#3b0b0f] text-white shadow-[inset_0_0_0_1px_rgba(229,9,20,0.18)]' : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'}`
   const username = session?.user?.user_metadata?.username || ''
   const contextLabel = view === 'series' ? seriesTitle : view === 'admin' ? 'Admin' : ''
-  const menuProps = { username, email: session?.user?.email || '', updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }
+  const menuProps = { username, email: session?.user?.email || '', isAdmin, openAdmin, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/90 shadow-[0_16px_40px_rgba(10,10,10,0.32)] backdrop-blur-xl">
       <div className="border-b border-white/[0.06]">
-        <div className="mx-auto flex h-[4.5rem] w-full max-w-[1800px] items-center gap-3 px-4 sm:px-6 lg:px-10">
-          <div className="flex min-w-0 items-center gap-3">
-            <button aria-label="Go to browse" className="group flex shrink-0 items-center gap-2.5 rounded-xl transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/60" onClick={() => setView('home')}>
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3b0b0f] ring-1 ring-[#E50914]/30 transition group-hover:bg-[#4b0e13] group-hover:ring-[#E50914]/50"><BookOpen className="h-5 w-5 text-[#E50914]" /></span>
+        <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center gap-2 px-3 sm:h-[4.5rem] sm:gap-3 sm:px-6 lg:px-10">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <button aria-label="Go to browse" className="group flex min-h-10 shrink-0 items-center gap-2 rounded-xl transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/60" onClick={() => setView('home')}>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#3b0b0f] ring-1 ring-[#E50914]/30 transition group-hover:bg-[#4b0e13] group-hover:ring-[#E50914]/50 sm:h-10 sm:w-10"><BookOpen className="h-4 w-4 text-[#E50914] sm:h-5 sm:w-5" /></span>
               <span className="font-display hidden text-[1.7rem] leading-none tracking-[0.08em] text-white sm:inline">MANHWA</span>
             </button>
             <nav aria-label="Primary navigation" className="hidden shrink-0 items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1 md:flex">
@@ -303,7 +304,8 @@ function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmi
             {contextLabel && <div className="hidden min-w-0 items-center gap-2 border-l border-white/10 pl-3 lg:flex"><span className="max-w-48 truncate text-sm text-gray-400">{contextLabel}</span></div>}
           </div>
           <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-            <label className="flex min-h-10 min-w-0 max-w-none flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#202020]/90 px-3 py-2 transition focus-within:border-[#E50914]/60 focus-within:bg-[#242424] focus-within:ring-2 focus-within:ring-[#E50914]/15 md:max-w-[360px] md:flex-none">
+            <button type="button" aria-label="Toggle search" aria-expanded={mobileSearchOpen} onClick={() => setMobileSearchOpen(!mobileSearchOpen)} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-gray-400 transition hover:bg-white/[0.06] hover:text-white active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/60 md:hidden"><Search className="h-5 w-5" /></button>
+            <label className="hidden min-h-10 min-w-0 max-w-none flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#202020]/90 px-3 py-2 transition focus-within:border-[#E50914]/60 focus-within:bg-[#242424] focus-within:ring-2 focus-within:ring-[#E50914]/15 md:flex md:max-w-[360px] md:flex-none">
               <Search className="h-4 w-4 shrink-0 text-gray-500" />
               <span className="sr-only">Search library</span>
               <input aria-label="Search library" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-56" />
@@ -312,17 +314,18 @@ function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmi
           </div>
         </div>
       </div>
+      {mobileSearchOpen && <div className="border-t border-white/[0.04] bg-[#171717]/95 px-3 py-2 md:hidden"><label className="flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#202020] px-3 py-2 focus-within:border-[#E50914]/60 focus-within:ring-2 focus-within:ring-[#E50914]/15"><Search className="h-4 w-4 shrink-0 text-gray-500" /><span className="sr-only">Search library</span><input autoFocus aria-label="Search library" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search your library" className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500" /></label></div>}
       <div className="border-t border-white/[0.04] bg-[#171717]/90 md:hidden">
-        <nav aria-label="Mobile navigation" className="mx-auto flex w-full max-w-[1800px] gap-1.5 overflow-x-auto px-3 py-2 sm:px-6">
+        <nav aria-label="Mobile navigation" className="mx-auto flex w-full max-w-[1440px] gap-1.5 overflow-x-auto px-3 py-2 sm:px-6">
           <button aria-current={view === 'home' ? 'page' : undefined} className={`${navClass(view === 'home')} min-w-0 flex-1 whitespace-nowrap`} onClick={() => setView('home')}><Home className="h-4 w-4 shrink-0" />Browse</button>
-          <button aria-current={view === 'admin' || (!session && view === 'auth') ? 'page' : undefined} className={`${navClass(view === 'admin' || (!session && view === 'auth'))} min-w-0 flex-1 whitespace-nowrap`} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4 shrink-0" />Admin</> : 'Sign in'}</button>
+          {!session && <button aria-current={view === 'auth' ? 'page' : undefined} className={`${navClass(view === 'auth')} min-w-0 flex-1 whitespace-nowrap`} onClick={openAdmin}>Sign in</button>}
         </nav>
       </div>
     </header>
   )
 }
 
-function UserMenu({ username, email, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }) {
+function UserMenu({ username, email, isAdmin, openAdmin, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(username)
   const [password, setPassword] = useState('')
@@ -348,6 +351,7 @@ function UserMenu({ username, email, updateUsername, changePassword, readerWidth
 
   function clearProgress() { clearReadingProgress(); setMessage('Reading progress cleared.') }
   function clearSavedFavorites() { clearFavorites(); setMessage('Favorites cleared.') }
+  function goToAdmin() { setOpen(false); openAdmin() }
 
   const settingsDialog = open && createPortal(
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#080808]/80 p-3 backdrop-blur-sm sm:p-6" onClick={() => setOpen(false)}>
@@ -397,7 +401,7 @@ function UserMenu({ username, email, updateUsername, changePassword, readerWidth
           </div>
         </div>
         {message && <p role="status" className="border-t border-white/10 bg-[#181818] px-5 py-3 text-sm text-gray-300 sm:px-6">{message}</p>}
-        <div className="border-t border-white/10 bg-[#252525] p-4 sm:px-6"><button type="button" onClick={signOut} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#303030] px-3 py-2.5 text-sm font-semibold text-gray-300 transition hover:bg-[#3a3a3a] hover:text-white active:scale-[0.98]"><SignOut size={18} />Sign out</button></div>
+        <div className="space-y-2 border-t border-white/10 bg-[#252525] p-4 sm:px-6">{isAdmin && <button type="button" onClick={goToAdmin} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#3b0b0f] px-3 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-[#4b0e13] hover:text-white active:scale-[0.98]"><UploadCloud className="h-4 w-4" />Admin upload</button>}<button type="button" onClick={signOut} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#303030] px-3 py-2.5 text-sm font-semibold text-gray-300 transition hover:bg-[#3a3a3a] hover:text-white active:scale-[0.98]"><SignOut size={18} />Sign out</button></div>
       </div>
     </div>, document.body)
   return <div className="relative shrink-0"><button aria-label="Open user settings" title={username ? `${username} settings` : 'User settings'} aria-expanded={open} onClick={() => setOpen(!open)} className={`flex h-10 w-10 items-center justify-center rounded-xl transition duration-200 active:scale-95 ${open ? 'bg-[#3b0b0f] text-white ring-1 ring-[#E50914]/30' : 'text-gray-400 hover:bg-white/[0.06] hover:text-white'}`}><UserCircle size={20} /></button>{settingsDialog}</div>
@@ -434,25 +438,25 @@ function HomeView({ series, continueSeries, lastRead, continueReading, openSerie
       <div className="relative mb-10 overflow-hidden rounded-xl bg-gradient-to-r from-[#3b0b0f] to-[#232323] p-6 sm:p-8 md:p-14"><div className="relative z-10 max-w-xl"><p className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-[#E50914]">Personal library</p><h1 className="mb-4 text-3xl font-black sm:text-4xl md:text-6xl">Read your way.</h1><p className="mb-6 text-gray-300">Upload a chapter PDF, convert it in your browser, and read it as a smooth vertical webtoon.</p><button onClick={openAdmin} className="rounded-lg bg-[#E50914] px-5 py-3 font-bold text-white transition hover:bg-red-700 active:scale-[0.99]">Upload a chapter</button></div></div>
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-white/10 pb-5"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#E50914]">Library</p><h2 className="text-2xl font-bold tracking-tight">Your series</h2></div><div className="flex flex-wrap items-center gap-2 sm:gap-3"><span className="text-sm text-gray-500">{series.length} titles</span><button onClick={() => setFavoritesOnly(!favoritesOnly)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${favoritesOnly ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{favoritesOnly ? 'Favorites' : `Favorites ${favoritesCount}`}</button><label className="flex items-center gap-2 rounded-lg border border-white/10 bg-[#202020] px-2.5 py-1.5 text-xs text-gray-400"><SlidersHorizontal className="h-3.5 w-3.5" /><span className="sr-only">Sort series</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)} className="bg-transparent text-xs text-gray-300 outline-none"><option value="recent">Recently added</option><option value="title">A to Z</option><option value="read">Recently read</option></select></label></div></div>
       {genres.length > 0 && <div className="mb-8"><div className="mb-3 flex items-center justify-between"><h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Browse by genre</h3>{selectedGenre && <button onClick={() => setSelectedGenre('')} className="text-xs font-semibold text-[#E50914] hover:text-red-300">Clear</button>}</div><div className="genre-scroll -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"><button aria-pressed={selectedGenre === ''} onClick={() => setSelectedGenre('')} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === '' ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>All</button>{genres.map((genre) => <button aria-pressed={selectedGenre === genre} key={genre} onClick={() => setSelectedGenre(selectedGenre === genre ? '' : genre)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${selectedGenre === genre ? 'bg-[#E50914] text-white' : 'bg-[#232323] text-gray-400 hover:bg-[#303030] hover:text-white'}`}>{genre}</button>)}</div></div>}
-      {series.length === 0 ? <EmptyState text={favoritesOnly ? 'No favorites yet. Tap the heart on a series to save it.' : selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid grid-cols-[repeat(auto-fill,minmax(125px,170px))] justify-start gap-3 sm:gap-4">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} isFavorite={favorites.includes(item.id)} toggleFavorite={() => toggleFavorite(item)} />)}</div>}
+      {series.length === 0 ? <EmptyState text={favoritesOnly ? 'No favorites yet. Tap the heart on a series to save it.' : selectedGenre ? `No series found in ${selectedGenre}.` : 'No series yet. Create one from Admin.'} /> : <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">{series.map((item) => <SeriesCard key={item.id} series={item} onClick={() => openSeries(item)} isFavorite={favorites.includes(item.id)} toggleFavorite={() => toggleFavorite(item)} />)}</div>}
     </section>
   )
 }
 
 function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) {
   const genre = extractGenres(series.description || '')[0]
-  return <article className="group relative overflow-hidden rounded-xl border border-white/[0.08] bg-[#202020] shadow-[0_12px_28px_rgba(10,10,10,0.18)] transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-[0_18px_36px_rgba(10,10,10,0.28)] focus-within:border-[#E50914]/70 focus-within:ring-2 focus-within:ring-[#E50914]/20">
+  return <article className="group relative min-w-0 overflow-hidden rounded-xl border border-white/[0.08] bg-[#202020] shadow-[0_12px_28px_rgba(10,10,10,0.18)] transition duration-300 md:hover:-translate-y-1 md:hover:border-white/20 md:hover:shadow-[0_18px_36px_rgba(10,10,10,0.28)] focus-within:border-[#E50914]/70 focus-within:ring-2 focus-within:ring-[#E50914]/20">
     <button className="block w-full text-left focus-visible:outline-none" onClick={onClick}>
-      <div className="relative overflow-hidden bg-[#181818]"><Cover series={series} className="transition duration-500 ease-out group-hover:scale-[1.04]" /><div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#202020]/70 to-transparent opacity-80" /></div>
-      <div className="border-t border-white/[0.07] p-3.5"><div className="flex items-center gap-2"><h3 className="min-w-0 flex-1 truncate font-bold text-white">{series.title}</h3><CardArrow className="h-4 w-4 shrink-0 text-gray-600 transition duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-[#E50914]" /></div><p className="mt-1 truncate text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-500">{genre || 'Read series'}</p></div>
+      <div className="relative overflow-hidden bg-[#181818]"><Cover series={series} className="transition duration-500 ease-out md:group-hover:scale-[1.04]" /><div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#202020]/70 to-transparent opacity-80" /></div>
+      <div className="border-t border-white/[0.07] p-3 sm:p-3.5"><div className="flex items-center gap-2"><h3 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{series.title}</h3><CardArrow className="h-4 w-4 shrink-0 text-gray-600 transition duration-300 md:group-hover:translate-x-0.5 md:group-hover:-translate-y-0.5 md:group-hover:text-[#E50914]" /></div><p className="mt-1 truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500 sm:text-[11px]">{genre || 'Read series'}</p></div>
     </button>
-    <button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} aria-pressed={isFavorite} onClick={toggleFavorite} className="absolute right-2.5 top-2.5 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-[#141414]/75 text-gray-300 backdrop-blur transition hover:border-red-300/40 hover:text-red-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/70"><FavoriteHeart size={16} weight={isFavorite ? 'fill' : 'regular'} /></button>
+    <button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} aria-pressed={isFavorite} onClick={toggleFavorite} className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#141414]/75 text-gray-300 backdrop-blur transition hover:border-red-300/40 hover:text-red-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/70"><FavoriteHeart size={16} weight={isFavorite ? 'fill' : 'regular'} /></button>
   </article>
 }
 function Cover({ series, className = '' }) {
   const hasCustomWidth = /\b(?:w-|max-w-)/.test(className)
   const widthClass = hasCustomWidth ? '' : 'w-full'
-  return series.cover_image_url ? <img src={series.cover_image_url} alt={`${series.title} cover`} className={`aspect-[2/3] ${widthClass} object-cover ${className}`} /> : <div className={`flex aspect-[2/3] ${widthClass} items-end bg-gradient-to-br from-[#5c1118] via-[#292929] to-[#111] p-4 ${className}`}><span className="text-2xl font-black">{series.title.slice(0, 1).toUpperCase()}</span></div>
+  return series.cover_image_url ? <img src={series.cover_image_url} alt={`${series.title} cover`} className={`block aspect-[2/3] ${widthClass} object-cover ${className}`} /> : <div className={`flex aspect-[2/3] ${widthClass} items-end bg-gradient-to-br from-[#5c1118] via-[#292929] to-[#111] p-4 ${className}`}><span className="text-2xl font-black">{series.title.slice(0, 1).toUpperCase()}</span></div>
 }
 
 function SeriesView({ series, chapters, back, openReader, isAdmin, deleteSeries, deleteChapter, updateSeries, lastRead, continueReading }) {
@@ -694,7 +698,7 @@ function AdminView({ series, refreshSeries, back, setMessage }) {
 }
 
 function LoadingState() {
-  return <div className="space-y-5" aria-label="Loading library" aria-busy="true"><div className="h-48 animate-pulse rounded-xl bg-[#232323] sm:h-56" /><div className="flex items-center gap-3"><LoaderCircle className="h-4 w-4 animate-spin text-[#E50914]" /><span className="text-sm text-gray-500">Loading your library</span></div><div className="grid grid-cols-[repeat(auto-fill,minmax(125px,170px))] gap-3 sm:gap-4">{[1, 2, 3, 4, 5].map((item) => <div key={item} className="overflow-hidden rounded-lg bg-[#232323]"><div className="aspect-[2/3] animate-pulse bg-[#2b2b2b]" /><div className="h-12 animate-pulse bg-[#242424]" /></div>)}</div></div>
+  return <div className="space-y-5" aria-label="Loading library" aria-busy="true"><div className="h-40 animate-pulse rounded-xl bg-[#232323] sm:h-56" /><div className="flex items-center gap-3"><LoaderCircle className="h-4 w-4 animate-spin text-[#E50914]" /><span className="text-sm text-gray-500">Loading your library</span></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">{[1, 2, 3, 4, 5, 6, 7].map((item) => <div key={item} className="min-w-0 overflow-hidden rounded-xl bg-[#232323]"><div className="aspect-[2/3] animate-pulse bg-[#2b2b2b]" /><div className="h-12 animate-pulse bg-[#242424]" /></div>)}</div></div>
 }
 function EmptyState({ text }) { return <div className="rounded-lg border border-dashed border-white/15 p-8 text-center text-gray-500">{text}</div> }
 function readReaderProgress(key, pageCount) {
