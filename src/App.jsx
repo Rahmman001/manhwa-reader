@@ -121,7 +121,7 @@ function App() {
   }, [session?.user?.id])
 
   async function openSeries(item) {
-    const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 680
+    const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 1100
     const startedAt = performance.now()
     setOpeningSeries(item); setMessage('')
     try {
