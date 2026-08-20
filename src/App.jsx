@@ -297,7 +297,7 @@ function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmi
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3b0b0f] ring-1 ring-[#E50914]/30 transition group-hover:bg-[#4b0e13] group-hover:ring-[#E50914]/50"><BookOpen className="h-5 w-5 text-[#E50914]" /></span>
               <span className="font-display hidden text-[1.7rem] leading-none tracking-[0.08em] text-white sm:inline">MANHWA</span>
             </button>
-            <nav aria-label="Primary navigation" className="hidden items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1 md:flex">
+            <nav aria-label="Primary navigation" className="hidden shrink-0 items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1 md:flex">
               <button aria-current={view === 'home' ? 'page' : undefined} className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
               <button aria-current={view === 'admin' || (!session && view === 'auth') ? 'page' : undefined} className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
             </nav>
@@ -307,7 +307,7 @@ function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmi
             <label className="flex min-h-10 min-w-0 max-w-none flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#202020]/90 px-3 py-2 transition focus-within:border-[#E50914]/60 focus-within:bg-[#242424] focus-within:ring-2 focus-within:ring-[#E50914]/15 md:max-w-[360px] md:flex-none">
               <Search className="h-4 w-4 shrink-0 text-gray-500" />
               <span className="sr-only">Search library</span>
-              <input aria-label="Search library" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-56" />
+              <input aria-label="Search library" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-56" />
             </label>
             {session && <UserMenu {...menuProps} />}
           </div>
@@ -315,8 +315,8 @@ function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmi
       </div>
       <div className="border-t border-white/[0.04] bg-[#171717]/90 md:hidden">
         <nav aria-label="Mobile navigation" className="mx-auto flex w-full max-w-[1800px] gap-1.5 overflow-x-auto px-3 py-2 sm:px-6">
-          <button aria-current={view === 'home' ? 'page' : undefined} className={`${navClass(view === 'home')} min-w-0 flex-1`} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
-          <button aria-current={view === 'admin' || (!session && view === 'auth') ? 'page' : undefined} className={`${navClass(view === 'admin' || (!session && view === 'auth'))} min-w-0 flex-1`} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
+          <button aria-current={view === 'home' ? 'page' : undefined} className={`${navClass(view === 'home')} min-w-0 flex-1 whitespace-nowrap`} onClick={() => setView('home')}><Home className="h-4 w-4 shrink-0" />Browse</button>
+          <button aria-current={view === 'admin' || (!session && view === 'auth') ? 'page' : undefined} className={`${navClass(view === 'admin' || (!session && view === 'auth'))} min-w-0 flex-1 whitespace-nowrap`} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4 shrink-0" />Admin</> : 'Sign in'}</button>
         </nav>
       </div>
     </header>
