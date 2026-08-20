@@ -284,39 +284,43 @@ function App() {
 }
 
 function Header({ view, seriesTitle, setView, search, setSearch, session, isAdmin, openAdmin, signOut, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount }) {
-  const navClass = (active) => `flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition duration-200 active:scale-[0.98] md:justify-start ${active ? 'bg-white/[0.08] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]' : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'}`
+  const navClass = (active) => `group flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition duration-200 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/60 md:justify-start ${active ? 'bg-[#3b0b0f] text-white shadow-[inset_0_0_0_1px_rgba(229,9,20,0.18)]' : 'text-gray-400 hover:bg-white/[0.05] hover:text-white'}`
   const username = session?.user?.user_metadata?.username || ''
+  const contextLabel = view === 'series' ? seriesTitle : view === 'admin' ? 'Admin' : ''
   const menuProps = { username, email: session?.user?.email || '', updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }
-  return <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/90 shadow-[0_16px_40px_rgba(10,10,10,0.32)] backdrop-blur-xl">
-    <div className="border-b border-white/[0.06]">
-      <div className="mx-auto flex h-[4.5rem] w-full max-w-[1800px] items-center gap-3 px-4 sm:px-6 lg:px-10">
-        <button aria-label="Go to browse" className="group flex shrink-0 items-center gap-2.5 rounded-xl transition active:scale-[0.98]" onClick={() => setView('home')}>
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3b0b0f] ring-1 ring-[#E50914]/30 transition group-hover:bg-[#4b0e13] group-hover:ring-[#E50914]/50"><BookOpen className="h-5 w-5 text-[#E50914]" /></span>
-          <span className="font-display hidden text-[1.7rem] leading-none tracking-[0.08em] text-white sm:inline">MANHWA</span>
-        </button>
-        <nav className="hidden items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1 md:flex">
-          <button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
-          <button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
-          {view === 'series' && <span className="ml-2 max-w-48 truncate border-l border-white/10 pl-3 text-sm text-gray-500">{seriesTitle}</span>}
-          {view === 'admin' && <span className="ml-2 border-l border-white/10 pl-3 text-sm text-gray-500">Admin</span>}
-        </nav>
-        <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-          <label className="flex min-h-10 min-w-0 max-w-[360px] flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#202020]/90 px-3 py-2 transition focus-within:border-[#E50914]/60 focus-within:bg-[#242424] focus-within:ring-2 focus-within:ring-[#E50914]/15 md:flex-none">
-            <Search className="h-4 w-4 shrink-0 text-gray-500" />
-            <span className="sr-only">Search library</span>
-            <input aria-label="Search library" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-56" />
-          </label>
-          {session && <UserMenu {...menuProps} />}
+  return (
+    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#141414]/90 shadow-[0_16px_40px_rgba(10,10,10,0.32)] backdrop-blur-xl">
+      <div className="border-b border-white/[0.06]">
+        <div className="mx-auto flex h-[4.5rem] w-full max-w-[1800px] items-center gap-3 px-4 sm:px-6 lg:px-10">
+          <div className="flex min-w-0 items-center gap-3">
+            <button aria-label="Go to browse" className="group flex shrink-0 items-center gap-2.5 rounded-xl transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/60" onClick={() => setView('home')}>
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3b0b0f] ring-1 ring-[#E50914]/30 transition group-hover:bg-[#4b0e13] group-hover:ring-[#E50914]/50"><BookOpen className="h-5 w-5 text-[#E50914]" /></span>
+              <span className="font-display hidden text-[1.7rem] leading-none tracking-[0.08em] text-white sm:inline">MANHWA</span>
+            </button>
+            <nav aria-label="Primary navigation" className="hidden items-center gap-1 rounded-xl border border-white/[0.07] bg-white/[0.025] p-1 md:flex">
+              <button aria-current={view === 'home' ? 'page' : undefined} className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
+              <button aria-current={view === 'admin' || (!session && view === 'auth') ? 'page' : undefined} className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
+            </nav>
+            {contextLabel && <div className="hidden min-w-0 items-center gap-2 border-l border-white/10 pl-3 lg:flex"><span className="max-w-48 truncate text-sm text-gray-400">{contextLabel}</span></div>}
+          </div>
+          <div className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
+            <label className="flex min-h-10 min-w-0 max-w-none flex-1 items-center gap-2 rounded-xl border border-white/10 bg-[#202020]/90 px-3 py-2 transition focus-within:border-[#E50914]/60 focus-within:bg-[#242424] focus-within:ring-2 focus-within:ring-[#E50914]/15 md:max-w-[360px] md:flex-none">
+              <Search className="h-4 w-4 shrink-0 text-gray-500" />
+              <span className="sr-only">Search library</span>
+              <input aria-label="Search library" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={view === 'home' ? 'Search title or genre' : 'Search'} className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-gray-500 md:w-56" />
+            </label>
+            {session && <UserMenu {...menuProps} />}
+          </div>
         </div>
       </div>
-    </div>
-    <div className="border-t border-white/[0.04] bg-[#171717]/90 md:hidden">
-      <nav className="mx-auto flex w-full max-w-[1800px] gap-1.5 overflow-x-auto px-3 py-2 sm:px-6">
-        <button className={navClass(view === 'home')} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
-        <button className={navClass(view === 'admin' || (!session && view === 'auth'))} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
-      </nav>
-    </div>
-  </header>
+      <div className="border-t border-white/[0.04] bg-[#171717]/90 md:hidden">
+        <nav aria-label="Mobile navigation" className="mx-auto flex w-full max-w-[1800px] gap-1.5 overflow-x-auto px-3 py-2 sm:px-6">
+          <button aria-current={view === 'home' ? 'page' : undefined} className={`${navClass(view === 'home')} min-w-0 flex-1`} onClick={() => setView('home')}><Home className="h-4 w-4" />Browse</button>
+          <button aria-current={view === 'admin' || (!session && view === 'auth') ? 'page' : undefined} className={`${navClass(view === 'admin' || (!session && view === 'auth'))} min-w-0 flex-1`} onClick={openAdmin}>{isAdmin ? <><UploadCloud className="h-4 w-4" />Admin</> : 'Sign in'}</button>
+        </nav>
+      </div>
+    </header>
+  )
 }
 
 function UserMenu({ username, email, updateUsername, changePassword, readerWidth, updateReaderWidth, clearReadingProgress, clearFavorites, favoritesCount, deleteAccount, signOut }) {
