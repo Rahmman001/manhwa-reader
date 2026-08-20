@@ -74,6 +74,7 @@ function App() {
   const [favorites, setFavorites] = useState(readFavorites(null))
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [sortBy, setSortBy] = useState('recent')
+  const [openingSeries, setOpeningSeries] = useState(null)
 
   async function refreshSeries() {
     setLoading(true)
@@ -120,8 +121,15 @@ function App() {
   }, [session?.user?.id])
 
   async function openSeries(item) {
-    setLoading(true); setMessage('')
-    try { setSelectedSeries(item); setChapters(await fetchChapters(item.id)); setView('series') } catch (error) { setMessage(error.message) } finally { setLoading(false) }
+    const duration = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0 : 680
+    const startedAt = performance.now()
+    setOpeningSeries(item); setMessage('')
+    try {
+      const nextChapters = await fetchChapters(item.id)
+      const remaining = Math.max(0, duration - (performance.now() - startedAt))
+      if (remaining) await new Promise((resolve) => setTimeout(resolve, remaining))
+      setSelectedSeries(item); setChapters(nextChapters); setView('series')
+    } catch (error) { setMessage(error.message) } finally { setOpeningSeries(null) }
   }
 
   async function enterReader(chapter) {
@@ -278,6 +286,7 @@ function App() {
         {!loading && view === 'auth' && <AuthView back={() => setView('home')} onAuthenticated={() => setView('home')} />}
         {!loading && view === 'admin' && isAdmin && <AdminView series={series} refreshSeries={refreshSeries} back={() => setView('home')} setMessage={setMessage} />}
       </main>
+      {openingSeries && <SeriesOpenTransition series={openingSeries} />}
     </div>
   )
 }
@@ -453,6 +462,16 @@ function SeriesCard({ series, onClick, isFavorite, toggleFavorite }) {
     <button aria-label={isFavorite ? `Remove ${series.title} from favorites` : `Add ${series.title} to favorites`} aria-pressed={isFavorite} onClick={toggleFavorite} className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-[#141414]/75 text-gray-300 backdrop-blur transition hover:border-red-300/40 hover:text-red-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E50914]/70"><FavoriteHeart size={16} weight={isFavorite ? 'fill' : 'regular'} /></button>
   </article>
 }
+
+function SeriesOpenTransition({ series }) {
+  return <div className="series-transition-overlay" role="status" aria-label={`Opening ${series.title}`}>
+    <div className="series-transition-card">
+      <div className="series-transition-face"><Cover series={series} className="rounded-2xl" /></div>
+      <div className="series-transition-face series-transition-back rounded-2xl bg-[#3b0b0f] p-5 text-center"><span className="font-display text-xl text-white">{series.title}</span></div>
+    </div>
+  </div>
+}
+
 function Cover({ series, className = '' }) {
   const hasCustomWidth = /\b(?:w-|max-w-)/.test(className)
   const widthClass = hasCustomWidth ? '' : 'w-full'
